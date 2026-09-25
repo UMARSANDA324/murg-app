@@ -3,9 +3,7 @@ const authRepo = require('../repositories/authRepository');
 const { AuthRepositoryError } = require('../repositories/authRepository');
 const { verifyPassword, hashPassword, md5Hash } = require('../utils/passwordUtils');
 const { success, error, unauthorized } = require('../utils/responseUtils');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'murg_fallback_secret';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const { JWT_SECRET, JWT_EXPIRES_IN } = require('../config/auth');
 
 class AuthController {
   async login(req, res, next) {
@@ -70,7 +68,7 @@ class AuthController {
           : (user.role === 'Admin' ? ['*'] : []);
       } catch (err) {
         // Corrupt JSON in permissions column — fall back gracefully
-        console.error(`[AUTH] Corrupt permissions JSON for user_id: ${user.id} — falling back to role-based default. Raw: ${user.permissions}`);
+        console.error(`[AUTH] Corrupt permissions JSON for user_id: ${user.id} — falling back to role-based default.`);
         permissions = user.role === 'Admin' ? ['*'] : [];
       }
 

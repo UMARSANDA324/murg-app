@@ -1,8 +1,7 @@
 const jwt = require('jsonwebtoken');
 const db = require('../config/database');
 const { unauthorized, forbidden } = require('../utils/responseUtils');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'murg_fallback_secret';
+const { JWT_SECRET } = require('../config/auth');
 
 /**
  * Verify JWT and attach user to req.user.
