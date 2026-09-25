@@ -1,0 +1,16 @@
+{
+  "name": "murg-textile-platform",
+  "version": "1.0.0",
+  "description": "MURG Textile Enterprises — Multi-Branch Management Platform",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev-orchestrator.js",
+    "build": "npm run build --prefix frontend",
+    "start": "npm run start --prefix backend",
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "check:db": "npm run check-db --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

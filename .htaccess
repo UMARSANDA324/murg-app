@@ -1,0 +1,13 @@
+RewriteEngine On
+RewriteBase /murg/
+
+# Redirect .php URLs to extensionless URLs (exclude POST and auth_bridge to prevent data/ticket loss)
+RewriteCond %{REQUEST_URI} !auth_bridge [NC]
+RewriteCond %{REQUEST_METHOD} !POST
+RewriteCond %{THE_REQUEST} \s/murg/([^.]+)\.php [NC]
+RewriteRule ^(.*)\.php$ $1 [R=301,L,NC,QSA]
+
+# Handle extensionless URLs
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}\.php -f
+RewriteRule ^(.*)$ $1.php [L]

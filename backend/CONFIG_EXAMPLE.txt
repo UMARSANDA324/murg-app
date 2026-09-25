@@ -1,0 +1,29 @@
+# EmailJS Configuration Example
+# Add these variables to your backend/.env file
+
+# Database Configuration
+DB_HOST=localhost
+DB_USER=root
+DB_PASS=
+DB_NAME=murg
+DB_PORT=3306
+
+# JWT Configuration
+JWT_SECRET=murg_fallback_secret_change_in_production
+JWT_EXPIRES_IN=7d
+
+# Server Configuration
+PORT=5000
+NODE_ENV=development
+CORS_ORIGIN=http://localhost:5173
+
+# EmailJS Configuration (Required for Password Reset OTP)
+# Get these values from https://dashboard.emailjs.com/
+EMAILJS_SERVICE_ID=your_service_id_here
+EMAILJS_TEMPLATE_ID=your_template_id_here
+EMAILJS_PUBLIC_KEY=your_public_key_here
+EMAILJS_PRIVATE_KEY=your_private_key_here
+
+# IMPORTANT: After setting these variables, you must enable
+# "API access from non-browser environments" in your EmailJS dashboard:
+# Account → General → Enable "API access from non-browser environments"

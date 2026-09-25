@@ -1,0 +1,15 @@
+<?php
+/**
+ * ONLINE DATABASE CONFIGURATION
+ * 
+ * Rename this file to db_config.php and configure with your online database credentials.
+ * This file will be automatically detected and used by the application when deployed online.
+ * 
+ * IMPORTANT: Keep this file secure and do not commit to public repositories.
+ */
+
+// Online database configuration
+define('DB_SERVER', 'your_online_host');
+define('DB_USER', 'your_online_username');
+define('DB_PASS', 'your_online_password');
+define('DB_NAME', 'your_online_database_name');
