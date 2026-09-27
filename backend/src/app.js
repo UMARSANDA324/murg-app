@@ -17,6 +17,8 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const shipmentReceiptRoutes = require('./routes/shipmentReceiptRoutes');
 const realtimeRoutes = require('./routes/realtimeRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const expenseRoutes = require('./routes/expenseRoutes');
+const returnsRoutes = require('./routes/returnsRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -54,6 +56,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/shipment-receipts', shipmentReceiptRoutes);
 app.use('/api/realtime', realtimeRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/returns', returnsRoutes);
 
 // 404 Handler
 app.use((req, res) => {

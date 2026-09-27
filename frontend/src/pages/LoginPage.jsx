@@ -92,9 +92,6 @@ export default function LoginPage() {
         {/* Footer info */}
         <div className="mt-8 pt-4 border-t border-slate-200 text-center text-xs text-slate-400">
           <p>Protected by Enterprise Role-Based Access Control</p>
-          <a href="/index.php" className="text-indigo-600 hover:underline mt-1 inline-block">
-            Switch to Legacy Login
-          </a>
         </div>
       </div>
     </div>

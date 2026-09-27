@@ -15,11 +15,18 @@ router.use(authenticate);
 // Used by the Goods Request form so staff can search the entire product catalog.
 router.get('/catalog', stockController.catalogSearch);
 
+// ─── Store management (authenticate only, branch scope in controller) ───────
+router.get('/stores', stockController.getStores);
+router.post('/stores', stockController.createStore);
+router.put('/stores/:id', stockController.updateStore);
+router.delete('/stores/:id', stockController.deleteStore);
+router.get('/purchases/history', stockController.getPurchaseHistory);
+router.get('/purchases/totals', stockController.getPurchaseTotals);
+
 // ─── Branch-scoped routes (authenticate + requireBranchScope) ─────────────
 router.use(requireBranchScope);
 
 router.get('/', stockController.list);
-router.get('/stores', stockController.getStores);
 router.get('/movements', stockController.getMovements);
 router.get('/:id', stockController.get);
 router.patch('/:id/price', requireAdminPriceControl, stockController.updatePrice);

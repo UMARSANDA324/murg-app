@@ -76,14 +76,6 @@ async function checkDbColumns() {
       console.log('[DB-CHECK] ✓ stocks.price_per_yard present');
     }
 
-    // Verify auth_bridge_tickets table
-    const [ticketTable] = await pool.query("SHOW TABLES LIKE 'auth_bridge_tickets'");
-    if (ticketTable.length === 0) {
-      console.warn('[DB-CHECK] ⚠️  auth_bridge_tickets table missing. Run migration 003.');
-    } else {
-      console.log('[DB-CHECK] ✓ auth_bridge_tickets table present');
-    }
-
   } catch (err) {
     if (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT') {
       console.error('');

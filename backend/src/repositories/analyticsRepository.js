@@ -24,7 +24,6 @@ class AnalyticsRepository {
 
     const r = rows[0];
     return {
-      day: r.today,
       today: r.today,
       weekStart: r.week_start,
       weekEnd: r.week_end,

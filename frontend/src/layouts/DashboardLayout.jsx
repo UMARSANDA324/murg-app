@@ -23,6 +23,9 @@ import {
   PackageCheck,
   AlertTriangle,
   Info,
+  DollarSign,
+  Undo2,
+  Store,
 } from 'lucide-react';
 
 // ─── Notification type → icon + nav destination ───────────────────────────────
@@ -203,11 +206,14 @@ export default function DashboardLayout() {
     { label: 'Shipments & Transfers', path: '/shipments', icon: Truck },
     { label: 'Goods Requests', path: '/goods-requests', icon: FileCheck2 },
     { label: 'Customers & Debts', path: '/customers', icon: Users },
+    { label: 'Expenses', path: '/expenses', icon: DollarSign },
+    { label: 'Returns', path: '/returns', icon: Undo2 },
   ];
 
   if (user?.isGlobalAdmin || user?.role === 'Admin') {
     navItems.push({ label: 'Staff & Roles', path: '/staff', icon: UserCheck });
     navItems.push({ label: 'Branch Management', path: '/branches', icon: Building2 });
+    navItems.push({ label: 'Store Management', path: '/stores', icon: Store });
     navItems.push({ label: 'Management', path: '/management', icon: ShieldCheck });
   }
 
@@ -248,18 +254,8 @@ export default function DashboardLayout() {
           })}
         </nav>
 
-        {/* Footer: Legacy link + Sign out */}
-        <div className="pt-4 border-t border-slate-800 mt-auto space-y-2">
-          <a
-            href="/system"
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
-          >
-            <span>Legacy PHP System</span>
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
-
+        {/* Footer: Sign out */}
+        <div className="pt-4 border-t border-slate-800 mt-auto">
           <button
             onClick={handleLogout}
             className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-xs font-medium text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition-colors cursor-pointer"

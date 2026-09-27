@@ -2,7 +2,6 @@
 .env
 *.env
 backend/.env
-.env.example
 
 # Dependencies
 node_modules/
@@ -16,3 +15,7 @@ frontend/dist/
 debug.txt
 temp_stocks.sql
 scratch/
+*.py
+update_*.php
+migrate_*.php
+list_tables.php
