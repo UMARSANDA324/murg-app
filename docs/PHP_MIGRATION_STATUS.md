@@ -21,12 +21,13 @@
 | 12 | `customer.php` (sub/system) | Customer management | CustomersPage.jsx | `/api/customers` | ✅ COVERED | ✅ YES |
 | 13 | `staff.php` (sub/system) | Staff management | StaffPage.jsx | `/api/staff` | ✅ COVERED | ✅ YES |
 | 14 | `branch.php` (system) | Branch management | BranchesPage.jsx | `/api/branches` | ✅ COVERED | ✅ YES |
-| 15 | `purchase.php` (sub/system) | Supplier purchases | StockPage.jsx (receiving) | `/api/stocks/receive` | ⚠️ PARTIAL | ⚠️ PARTIAL |
-| 16 | `return.php` (sub/system) | Returns | ReturnsPage.jsx | `/api/returns` | ✅ MIGRATED | ✅ YES |
-| 17 | `monthly.php` (sub/system) | Monthly reports | ManagementPage.jsx | `/api/analytics` | ✅ COVERED | ✅ YES |
-| 18 | `weekly.php` (sub/system) | Weekly reports | ManagementPage.jsx | `/api/analytics` | ✅ COVERED | ✅ YES |
-| 19 | `month_purchase.php` (sub/system) | Purchase reports | ManagementPage.jsx | `/api/analytics` | ✅ COVERED | ✅ YES |
-| 20 | `store.php` (system) | Store management | StockPage.jsx (read-only) | `/api/stocks/stores` (read-only) | ⚠️ PARTIAL | ⚠️ PARTIAL |
+| 15 | `purchase.php` (sub/system) | Supplier purchases | StockPage.jsx (receiving) | `/api/stocks/receive` + `/api/stocks/purchases` | ✅ COVERED | ✅ YES |
+| 16 | `view-purchase.php` (sub/system) | Purchase history viewing | ManagementPage.jsx | `/api/stocks/purchases/history` | ✅ COVERED | ✅ YES |
+| 17 | `return.php` (sub/system) | Returns | ReturnsPage.jsx | `/api/returns` | ✅ MIGRATED | ✅ YES |
+| 18 | `monthly.php` (sub/system) | Monthly reports | ManagementPage.jsx | `/api/analytics` | ✅ COVERED | ✅ YES |
+| 19 | `weekly.php` (sub/system) | Weekly reports | ManagementPage.jsx | `/api/analytics` | ✅ COVERED | ✅ YES |
+| 20 | `month_purchase.php` (sub/system) | Purchase reports | ManagementPage.jsx | `/api/analytics` | ✅ COVERED | ✅ YES |
+| 21 | `store.php` (system) | Store management | StoresPage.jsx | `/api/stocks/stores` | ✅ MIGRATED | ✅ YES |
 | 20 | `get_price.php` (front/sub/system) | AJAX price lookup | - | `/api/stocks` | ✅ COVERED | ✅ YES |
 | 21 | `get_qty.php` (front/sub/system) | AJAX quantity lookup | - | `/api/stocks` | ✅ COVERED | ✅ YES |
 | 22 | `get_queue.php` (front) | AJAX queue lookup | - | - | ⚠️ DEPRECATED | - |
@@ -129,28 +130,80 @@
 
 **Migration Date:** 2026-09-27
 
-## In Progress
-
-### 3. Store Management ⏳
+### 3. Store Management ✅
 
 **PHP Files:** `system/store.php`
 
 **Functionality:**
 - Create new stores within branches
 - Update existing stores
-- Deactivate/activate stores
+- Deactivate/activate stores (soft delete)
 - Validate branch assignment
 - Prevent duplicate store names per branch
 
-**React Replacement:** Partial - StockPage can read stores but cannot create/update
+**React Replacement:** `frontend/src/pages/StoresPage.jsx`
+- Full CRUD interface
+- Branch filtering for global admins
+- Modal forms for add/edit
+- Delete confirmation
+- Status display (active/inactive)
+- Admin-only access enforcement
 
-**Node API:** Partial - `/api/stocks/stores` is read-only only
+**Node API:** `/api/stocks/stores`
+- `GET /api/stocks/stores` - List stores with branch filter
+- `POST /api/stocks/stores` - Create store
+- `PUT /api/stocks/stores/:id` - Update store
+- `DELETE /api/stocks/stores/:id` - Soft delete store
 
 **Database Tables:** `stores`
 
-**Status:** Backend needs write operations (CREATE, UPDATE, DELETE), frontend needs management UI
+**Testing:** ✅ All CRUD operations tested via API
+- Create: ✅
+- Read: ✅
+- Update: ✅
+- Delete (soft): ✅
+- Duplicate prevention: ✅
+- Branch validation: ✅
+- Admin-only access: ✅
 
-**Complexity:** LOW - Simple CRUD with branch validation
+**Migration Date:** 2026-09-27
+
+### 4. Supplier Purchases ✅
+
+**PHP Files:** `sub/purchase.php`, `sub/view-purchase.php`, `system/purchase.php`, `system/view-purchase.php`
+
+**Functionality:**
+- Record supplier purchases
+- Track purchase history by date/month
+- Calculate purchase totals (total cost, amount paid, balance)
+- View purchase history with filtering
+- Supplier information tracking
+- Branch-level purchase tracking
+
+**React Replacement:** 
+- Stock receiving in `StockPage.jsx` handles purchase recording
+- Management dashboard can display purchase analytics
+- Purchase history can be viewed via new API endpoints
+
+**Node API:** 
+- `/api/stocks/receive` - Record stock receiving with purchase history
+- `/api/stocks/purchases/history` - Get purchase history with date/month filtering
+- `/api/stocks/purchases/totals` - Get purchase totals (total cost, paid, balance)
+
+**Database Tables:** `purchase_history`, `stocks`
+
+**Testing:** ✅ Purchase history API tested
+- Stock receiving: ✅ (existing functionality)
+- Purchase history retrieval: ✅
+- Purchase totals calculation: ✅
+- Date/month filtering: ✅
+- Branch isolation: ✅
+
+**Migration Date:** 2026-09-27
+
+## In Progress
+
+None currently in progress.
 
 ## Remaining Critical Modules
 
