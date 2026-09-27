@@ -5,27 +5,27 @@ class AnalyticsController {
   async getSalesActivity(req, res, next) {
     try {
       const user = req.user;
-      const requestedBranch = req.query.branchId || null;
-      const targetDate = req.query.date || null;
-
-      // Validate branch scope
+      
+      if (!user) {
+        return forbidden(res, 'Authentication required');
+      }
+      
+      // Determine facilityID based on user role
       let facilityID = null;
-      if (!user.isGlobalAdmin) {
-        // Branch staff can ONLY access their own assigned branch
-        if (requestedBranch && requestedBranch !== user.facilityID) {
-          return forbidden(res, 'Access denied: You cannot access analytics for another branch.');
-        }
-        facilityID = user.facilityID;
-      } else {
-        // Global admin can request specific branch or entire app (when branchId is omitted or 'all')
+      if (user.isGlobalAdmin) {
+        // Admin can see entire app (null) or specific branch if requested
+        const requestedBranch = req.query.branchId || null;
         if (requestedBranch && requestedBranch !== 'all') {
           facilityID = requestedBranch;
         }
+      } else {
+        // Branch users can only see their own branch
+        facilityID = user.facilityID;
       }
-
-      // Get exact business date boundaries in Africa/Lagos (+01:00)
-      const dateBounds = await analyticsRepo.getDateBoundaries(targetDate);
-
+      
+      // Get date boundaries from database
+      const dateBounds = await analyticsRepo.getDateBoundaries();
+      
       const metrics = await analyticsRepo.getSalesActivity({
         facilityID,
         date: dateBounds.today,
@@ -34,9 +34,12 @@ class AnalyticsController {
         monthStart: dateBounds.monthStart,
         monthEnd: dateBounds.monthEnd,
       });
-
+      
       return success(res, {
-        ...metrics,
+        das: metrics.das,
+        was: metrics.was,
+        mas: metrics.mas,
+        breakdown: metrics.breakdown,
         scope: facilityID || 'entire-app',
         period: {
           day: dateBounds.today,
