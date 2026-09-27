@@ -1,23 +1,6 @@
-const crypto = require('crypto');
 const db = require('../config/database');
 
 class ManagementRepository {
-  /**
-   * Generates a cryptographically secure, 60-second single-use bridge ticket
-   */
-  async createBridgeTicket({ userId, facilityID, role, email, name, targetPath }) {
-    const ticket = crypto.randomBytes(32).toString('hex');
-
-    await db.query(
-      `INSERT INTO auth_bridge_tickets 
-       (ticket, user_id, facilityID, role, email, name, target_path, consumed, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0, DATE_ADD(NOW(), INTERVAL 60 SECOND))`,
-      [ticket, userId, facilityID, role, email, name, targetPath]
-    );
-
-    return ticket;
-  }
-
   /**
    * Global multi-branch administrative overview
    */

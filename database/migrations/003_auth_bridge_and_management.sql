@@ -1,5 +1,7 @@
 -- Migration 003: Auth Bridge Tickets and Management
+-- DEPRECATED: This migration is no longer required as auth_bridge.php has been removed.
 -- Safe, additive migration. Preserves all existing tables, rows, and business data.
+-- The auth_bridge_tickets table created by this migration is now unused but harmless.
 
 CREATE TABLE IF NOT EXISTS auth_bridge_tickets (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
