@@ -14,6 +14,7 @@ import StaffPage from './pages/StaffPage';
 import BranchesPage from './pages/BranchesPage';
 import ManagementPage from './pages/ManagementPage';
 import ExpensesPage from './pages/ExpensesPage';
+import ReturnsPage from './pages/ReturnsPage';
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { isAuthenticated, user } = useAuthStore();
@@ -51,6 +52,7 @@ export default function App() {
           <Route path="goods-requests" element={<GoodsRequestsPage />} />
           <Route path="customers" element={<CustomersPage />} />
           <Route path="expenses" element={<ExpensesPage />} />
+          <Route path="returns" element={<ReturnsPage />} />
           <Route
             path="management"
             element={

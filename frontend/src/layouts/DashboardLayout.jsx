@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   Info,
   DollarSign,
+  Undo2,
 } from 'lucide-react';
 
 // ─── Notification type → icon + nav destination ───────────────────────────────
@@ -205,6 +206,7 @@ export default function DashboardLayout() {
     { label: 'Goods Requests', path: '/goods-requests', icon: FileCheck2 },
     { label: 'Customers & Debts', path: '/customers', icon: Users },
     { label: 'Expenses', path: '/expenses', icon: DollarSign },
+    { label: 'Returns', path: '/returns', icon: Undo2 },
   ];
 
   if (user?.isGlobalAdmin || user?.role === 'Admin') {
