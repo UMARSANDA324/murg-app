@@ -20,6 +20,8 @@ router.get('/stores', stockController.getStores);
 router.post('/stores', stockController.createStore);
 router.put('/stores/:id', stockController.updateStore);
 router.delete('/stores/:id', stockController.deleteStore);
+router.get('/purchases/history', stockController.getPurchaseHistory);
+router.get('/purchases/totals', stockController.getPurchaseTotals);
 
 // ─── Branch-scoped routes (authenticate + requireBranchScope) ─────────────
 router.use(requireBranchScope);

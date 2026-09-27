@@ -377,6 +377,61 @@ class StockController {
     }
   }
 
+  async getPurchaseHistory(req, res, next) {
+    try {
+      const user = req.user;
+      if (!user) {
+        return forbidden(res, 'Authentication required');
+      }
+
+      const facilityID = user.isGlobalAdmin 
+        ? (req.query.branchId || user.facilityID)
+        : user.facilityID;
+
+      const { month, year, fromDate, toDate, limit } = req.query;
+
+      const history = await stockRepo.getPurchaseHistory({
+        facilityID,
+        month: month ? parseInt(month) : null,
+        year: year ? parseInt(year) : null,
+        fromDate,
+        toDate,
+        limit: limit ? parseInt(limit) : 100,
+      });
+
+      return success(res, history);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getPurchaseTotals(req, res, next) {
+    try {
+      const user = req.user;
+      if (!user) {
+        return forbidden(res, 'Authentication required');
+      }
+
+      const facilityID = user.isGlobalAdmin 
+        ? (req.query.branchId || user.facilityID)
+        : user.facilityID;
+
+      const { month, year, fromDate, toDate } = req.query;
+
+      const totals = await stockRepo.getPurchaseTotals({
+        facilityID,
+        month: month ? parseInt(month) : null,
+        year: year ? parseInt(year) : null,
+        fromDate,
+        toDate,
+      });
+
+      return success(res, totals);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   /**
    * Global catalog search — not scoped to any branch.
    * Returns distinct active product names from all facilities.
