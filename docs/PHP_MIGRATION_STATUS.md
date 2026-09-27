@@ -22,10 +22,11 @@
 | 13 | `staff.php` (sub/system) | Staff management | StaffPage.jsx | `/api/staff` | ✅ COVERED | ✅ YES |
 | 14 | `branch.php` (system) | Branch management | BranchesPage.jsx | `/api/branches` | ✅ COVERED | ✅ YES |
 | 15 | `purchase.php` (sub/system) | Supplier purchases | StockPage.jsx (receiving) | `/api/stocks/receive` | ⚠️ PARTIAL | ⚠️ PARTIAL |
-| 16 | `return.php` (sub/system) | Returns | - | - | ⏳ IN PROGRESS | - |
+| 16 | `return.php` (sub/system) | Returns | ReturnsPage.jsx | `/api/returns` | ✅ MIGRATED | ✅ YES |
 | 17 | `monthly.php` (sub/system) | Monthly reports | ManagementPage.jsx | `/api/analytics` | ✅ COVERED | ✅ YES |
 | 18 | `weekly.php` (sub/system) | Weekly reports | ManagementPage.jsx | `/api/analytics` | ✅ COVERED | ✅ YES |
 | 19 | `month_purchase.php` (sub/system) | Purchase reports | ManagementPage.jsx | `/api/analytics` | ✅ COVERED | ✅ YES |
+| 20 | `store.php` (system) | Store management | StockPage.jsx (read-only) | `/api/stocks/stores` (read-only) | ⚠️ PARTIAL | ⚠️ PARTIAL |
 | 20 | `get_price.php` (front/sub/system) | AJAX price lookup | - | `/api/stocks` | ✅ COVERED | ✅ YES |
 | 21 | `get_qty.php` (front/sub/system) | AJAX quantity lookup | - | `/api/stocks` | ✅ COVERED | ✅ YES |
 | 22 | `get_queue.php` (front) | AJAX queue lookup | - | - | ⚠️ DEPRECATED | - |
@@ -130,7 +131,26 @@
 
 ## In Progress
 
-None currently in progress.
+### 3. Store Management ⏳
+
+**PHP Files:** `system/store.php`
+
+**Functionality:**
+- Create new stores within branches
+- Update existing stores
+- Deactivate/activate stores
+- Validate branch assignment
+- Prevent duplicate store names per branch
+
+**React Replacement:** Partial - StockPage can read stores but cannot create/update
+
+**Node API:** Partial - `/api/stocks/stores` is read-only only
+
+**Database Tables:** `stores`
+
+**Status:** Backend needs write operations (CREATE, UPDATE, DELETE), frontend needs management UI
+
+**Complexity:** LOW - Simple CRUD with branch validation
 
 ## Remaining Critical Modules
 

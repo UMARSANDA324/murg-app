@@ -252,9 +252,126 @@ class StockController {
 
   async getStores(req, res, next) {
     try {
-      const facilityID = req.branchId;
+      const user = req.user;
+      if (!user) {
+        return forbidden(res, 'Authentication required');
+      }
+
+      const facilityID = user.isGlobalAdmin 
+        ? (req.query.branchId || user.facilityID)
+        : user.facilityID;
+
       const stores = await stockRepo.getStores(facilityID);
       return success(res, stores);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async createStore(req, res, next) {
+    try {
+      const user = req.user;
+      if (!user) {
+        return forbidden(res, 'Authentication required');
+      }
+
+      const { storeName, branchId, status } = req.body;
+
+      if (!storeName || !branchId) {
+        return error(res, 'Store name and branch are required');
+      }
+
+      // Admins can create stores for any branch
+      // Staff can only create stores for their own branch
+      if (!user.isGlobalAdmin && branchId !== user.facilityID) {
+        return forbidden(res, 'You can only create stores for your own branch');
+      }
+
+      const storeId = await stockRepo.createStore({
+        facilityID: branchId,
+        storeName,
+        branchId,
+        status: status || 'active',
+      });
+
+      const store = await stockRepo.getStoreById(storeId, branchId);
+      return success(res, store, 'Store created successfully');
+    } catch (err) {
+      if (err.message.includes('already exists')) {
+        return error(res, err.message);
+      }
+      next(err);
+    }
+  }
+
+  async updateStore(req, res, next) {
+    try {
+      const user = req.user;
+      if (!user) {
+        return forbidden(res, 'Authentication required');
+      }
+
+      const { id } = req.params;
+      const { storeName, branchId, status } = req.body;
+
+      if (!storeName || !branchId) {
+        return error(res, 'Store name and branch are required');
+      }
+
+      // Admins can update stores for any branch
+      // Staff can only update stores in their own branch
+      if (!user.isGlobalAdmin && branchId !== user.facilityID) {
+        return forbidden(res, 'You can only update stores in your own branch');
+      }
+
+      const updated = await stockRepo.updateStore(id, {
+        facilityID: branchId,
+        storeName,
+        branchId,
+        status,
+      });
+
+      if (!updated) {
+        return notFound(res, 'Store not found');
+      }
+
+      const store = await stockRepo.getStoreById(id, branchId);
+      return success(res, store, 'Store updated successfully');
+    } catch (err) {
+      if (err.message.includes('already exists')) {
+        return error(res, err.message);
+      }
+      next(err);
+    }
+  }
+
+  async deleteStore(req, res, next) {
+    try {
+      const user = req.user;
+      if (!user) {
+        return forbidden(res, 'Authentication required');
+      }
+
+      const { id } = req.params;
+      const { branchId } = req.query;
+
+      if (!branchId) {
+        return error(res, 'Branch ID is required');
+      }
+
+      // Admins can delete stores for any branch
+      // Staff can only delete stores in their own branch
+      if (!user.isGlobalAdmin && branchId !== user.facilityID) {
+        return forbidden(res, 'You can only delete stores in your own branch');
+      }
+
+      const deleted = await stockRepo.deleteStore(id, branchId);
+
+      if (!deleted) {
+        return notFound(res, 'Store not found');
+      }
+
+      return success(res, null, 'Store deleted successfully');
     } catch (err) {
       next(err);
     }

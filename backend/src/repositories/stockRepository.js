@@ -246,6 +246,68 @@ class StockRepository {
   }
 
   /**
+   * Get store by ID
+   */
+  async getStoreById(id, facilityID) {
+    const [rows] = await db.query(
+      'SELECT * FROM stores WHERE id = ? AND branch_id = ?',
+      [id, facilityID]
+    );
+    return rows[0] || null;
+  }
+
+  /**
+   * Create new store
+   */
+  async createStore({ facilityID, storeName, branchId, status = 'active' }) {
+    // Check for duplicate store name in same branch
+    const [existing] = await db.query(
+      'SELECT id FROM stores WHERE store_name = ? AND branch_id = ?',
+      [storeName, branchId]
+    );
+    if (existing.length > 0) {
+      throw new Error('A store with this name already exists for this branch');
+    }
+
+    const [result] = await db.query(
+      'INSERT INTO stores (store_name, branch_id, status) VALUES (?, ?, ?)',
+      [storeName, branchId, status]
+    );
+    return result.insertId;
+  }
+
+  /**
+   * Update store
+   */
+  async updateStore(id, { facilityID, storeName, branchId, status }) {
+    // Check for duplicate store name (excluding current store)
+    const [existing] = await db.query(
+      'SELECT id FROM stores WHERE store_name = ? AND branch_id = ? AND id != ?',
+      [storeName, branchId, id]
+    );
+    if (existing.length > 0) {
+      throw new Error('A store with this name already exists for this branch');
+    }
+
+    const [result] = await db.query(
+      'UPDATE stores SET store_name = ?, branch_id = ?, status = ? WHERE id = ?',
+      [storeName, branchId, status, id]
+    );
+    return result.affectedRows > 0;
+  }
+
+  /**
+   * Delete store (soft delete by setting status to inactive)
+   */
+  async deleteStore(id, facilityID) {
+    const [result] = await db.query(
+      'UPDATE stores SET status = ? WHERE id = ? AND branch_id = ?',
+      ['inactive', id, facilityID]
+    );
+    return result.affectedRows > 0;
+  }
+
+  /**
    * Global catalog search — returns distinct product names across ALL branches.
    * Intentionally has no facilityID filter.
    * Used by the Goods Request form so staff can request any product in the system.
