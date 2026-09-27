@@ -89,51 +89,6 @@ export default function ManagementPage() {
     }
   };
 
-  const legacyModules = [
-    {
-      title: 'Expense Management',
-      path: '/system/expense.php',
-      desc: 'Record branch overheads, utilities, logistics and daily operational expenses.',
-      icon: DollarSign,
-      color: 'bg-emerald-500',
-    },
-    {
-      title: 'Bank Deposits & Accounts',
-      path: '/system/deposit.php',
-      desc: 'Manage bank lodgments, customer account balances and deposit slips.',
-      icon: Receipt,
-      color: 'bg-blue-500',
-    },
-    {
-      title: 'Supplier Purchases & Orders',
-      path: '/system/purchase.php',
-      desc: 'Purchase order processing, invoice attachments and supplier payables.',
-      icon: ShoppingCart,
-      color: 'bg-purple-500',
-    },
-    {
-      title: 'Store & Warehouse Setup',
-      path: '/system/store.php',
-      desc: 'Configure physical storage sections, aisles and bulk storage racks.',
-      icon: Warehouse,
-      color: 'bg-amber-500',
-    },
-    {
-      title: 'Product Returns',
-      path: '/system/return.php',
-      desc: 'Process damaged fabric claims, customer returns and stock reversals.',
-      icon: RotateCcw,
-      color: 'bg-rose-500',
-    },
-    {
-      title: 'Legacy Comprehensive Reports',
-      path: '/system/report.php',
-      desc: 'Audited monthly financial summaries, sales history and ledger reconciliation.',
-      icon: FileText,
-      color: 'bg-indigo-500',
-    },
-  ];
-
   const modernModules = [
     {
       title: 'Branch Management',
