@@ -8,7 +8,7 @@
 | # | PHP Module | Purpose | React Equivalent | Node API | Status | Tested |
 |---|------------|---------|------------------|-----------|--------|--------|
 | 1 | `expense.php` (front/sub/system) | Branch expense tracking | ExpensesPage.jsx | `/api/expenses` | ✅ MIGRATED | ✅ YES |
-| 2 | `return.php` (front/sub/system) | Order returns and stock restoration | - | - | ⏳ IN PROGRESS | - |
+| 2 | `return.php` (front/sub/system) | Order returns and stock restoration | ReturnsPage.jsx | `/api/returns` | ✅ MIGRATED | ✅ YES |
 | 3 | `cart.php` (front) | POS cart | POSTerminalPage.jsx | `/api/sales/checkout` | ✅ COVERED | ✅ YES |
 | 4 | `credit.php` (front/sub/system) | Credit sales | POSTerminalPage.jsx | `/api/sales/checkout` | ✅ COVERED | ✅ YES |
 | 5 | `deposit.php` (front/sub/system) | Customer deposits | CustomersPage.jsx | `/api/customers/deposit` | ✅ COVERED | ✅ YES |
@@ -93,24 +93,44 @@
 
 **Migration Date:** 2026-09-27
 
-## In Progress
-
-### 2. Order Returns ⏳
+### 2. Order Returns ✅
 
 **PHP Files:** `front/return.php`, `sub/return.php`, `system/return.php`
 
 **Functionality:**
 - Return completed orders to cart
-- Restore stock quantities
+- Restore stock quantities atomically
 - Reverse debt for credit sales
 - Delete order records
 - Preserve store_id for stock tracking
+- Validate order before return
 
-**Status:** Currently implementing Node.js backend
+**React Replacement:** `frontend/src/pages/ReturnsPage.jsx`
+- Order ID input and validation
+- Validation before processing
+- Success/error feedback
+- Responsive design
+
+**Node API:** `/api/returns`
+- `POST /api/returns/process` - Process order return (atomic transaction)
+- `GET /api/returns/validate/:orderID` - Validate if order can be returned
 
 **Database Tables:** `orders`, `cart`, `stocks`, `outstand`
 
-**Complexity:** HIGH - Requires atomic transactions for stock restoration and debt reversal
+**Testing:** ✅ End-to-end return tested
+- Validation: ✅
+- Stock restoration: ✅
+- Cart insertion: ✅
+- Order deletion: ✅
+- Debt reversal: ✅ (when applicable)
+- Transaction rollback: ✅ (on error)
+- Branch isolation: ✅
+
+**Migration Date:** 2026-09-27
+
+## In Progress
+
+None currently in progress.
 
 ## Remaining Critical Modules
 
