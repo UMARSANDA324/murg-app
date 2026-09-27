@@ -25,6 +25,7 @@ import {
   Info,
   DollarSign,
   Undo2,
+  Store,
 } from 'lucide-react';
 
 // ─── Notification type → icon + nav destination ───────────────────────────────
@@ -212,6 +213,7 @@ export default function DashboardLayout() {
   if (user?.isGlobalAdmin || user?.role === 'Admin') {
     navItems.push({ label: 'Staff & Roles', path: '/staff', icon: UserCheck });
     navItems.push({ label: 'Branch Management', path: '/branches', icon: Building2 });
+    navItems.push({ label: 'Store Management', path: '/stores', icon: Store });
     navItems.push({ label: 'Management', path: '/management', icon: ShieldCheck });
   }
 
