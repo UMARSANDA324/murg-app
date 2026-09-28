@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
-const authRepo = require('../repositories/authRepository');
-const { AuthRepositoryError } = require('../repositories/authRepository');
+const authRepo = require('../repositories/authRepositoryMongo');
+const { AuthRepositoryError } = require('../repositories/authRepositoryMongo');
 const { verifyPassword, hashPassword, md5Hash } = require('../utils/passwordUtils');
 const { success, error, unauthorized } = require('../utils/responseUtils');
 const { JWT_SECRET, JWT_EXPIRES_IN } = require('../config/auth');
@@ -37,14 +37,14 @@ class AuthController {
 
       // --- Step 2: Account status check ---
       if (user.status !== 1) {
-        console.warn(`[AUTH_LOGIN_FAILED] account_suspended — user_id: ${user.id} email: ${user.email}`);
+        console.warn(`[AUTH_LOGIN_FAILED] account_suspended — user_id: ${user._id} email: ${user.email}`);
         return unauthorized(res, 'Account suspended. Contact system administrator.');
       }
 
       // --- Step 3: Password verification ---
       const { valid, needsUpgrade, method } = await verifyPassword(password, user);
       if (!valid) {
-        console.warn(`[AUTH_LOGIN_FAILED] password_mismatch — user_id: ${user.id} method: ${method}`);
+        console.warn(`[AUTH_LOGIN_FAILED] password_mismatch — user_id: ${user._id} method: ${method}`);
         return unauthorized(res, 'Invalid email or password');
       }
 
@@ -52,11 +52,11 @@ class AuthController {
       if (needsUpgrade) {
         try {
           const bcryptHash = await hashPassword(password);
-          await authRepo.upgradeToBcrypt(user.id, bcryptHash);
-          console.log(`[AUTH] Upgraded password hash from MD5 to bcrypt for user_id: ${user.id}`);
+          await authRepo.upgradeToBcrypt(user.mysqlId, bcryptHash);
+          console.log(`[AUTH] Upgraded password hash from MD5 to bcrypt for user_id: ${user.mysqlId}`);
         } catch (err) {
           // Non-fatal: upgrade failure does not block login
-          console.error('[AUTH] Failed to upgrade password to bcrypt for user_id:', user.id, '—', err.message);
+          console.error('[AUTH] Failed to upgrade password to bcrypt for user_id:', user.mysqlId, '—', err.message);
         }
       }
 
@@ -64,18 +64,18 @@ class AuthController {
       let permissions;
       try {
         permissions = user.permissions
-          ? JSON.parse(user.permissions)
+          ? (Array.isArray(user.permissions) ? user.permissions : JSON.parse(user.permissions))
           : (user.role === 'Admin' ? ['*'] : []);
       } catch (err) {
         // Corrupt JSON in permissions column — fall back gracefully
-        console.error(`[AUTH] Corrupt permissions JSON for user_id: ${user.id} — falling back to role-based default.`);
+        console.error(`[AUTH] Corrupt permissions JSON for user_id: ${user._id} — falling back to role-based default.`);
         permissions = user.role === 'Admin' ? ['*'] : [];
       }
 
       // --- Step 6: Generate JWT ---
       const token = jwt.sign(
         {
-          sub: user.id,
+          sub: user._id,
           name: user.name,
           email: user.email,
           role: user.role,
@@ -89,7 +89,7 @@ class AuthController {
 
       // Safe user object for client (no passwords, no hashes)
       const safeUser = {
-        id: user.id,
+        id: user._id,
         name: user.name,
         fname: user.fname,
         email: user.email,
@@ -100,7 +100,7 @@ class AuthController {
         permissions,
       };
 
-      console.log(`[AUTH] Login successful — user_id: ${user.id} role: ${user.role} facilityID: ${user.facilityID}`);
+      console.log(`[AUTH] Login successful — user_id: ${user._id} role: ${user.role} facilityID: ${user.facilityID}`);
       return success(res, { token, user: safeUser }, 'Login successful');
     } catch (err) {
       console.error('[AUTH_LOGIN_FAILED] Unhandled exception:', err.message);
