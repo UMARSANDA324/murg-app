@@ -10,7 +10,6 @@ const purchaseSchema = new mongoose.Schema({
   facilityID: {
     type: String,
     required: true,
-    index: true,
   },
   stock_id: {
     type: mongoose.Schema.Types.ObjectId,

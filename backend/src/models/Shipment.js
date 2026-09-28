@@ -7,19 +7,9 @@ const shipmentSchema = new mongoose.Schema({
     unique: true,
     required: true,
   },
-  tracking_number: {
-    type: String,
-    required: true,
-    unique: true,
-  },
-  source_branch: {
-    type: String,
-    required: true,
-  },
-  destination_branch: {
-    type: String,
-    required: true,
-  },
+  tracking_number: String,
+  source_branch: String,
+  destination_branch: String,
   source_store_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Store',
@@ -32,12 +22,12 @@ const shipmentSchema = new mongoose.Schema({
     type: String,
     enum: ['Draft', 'Pending', 'In Transit', 'Received', 'Cancelled'],
     default: 'Draft',
-    index: true,
   },
   dispatched_by: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   },
+  legacy_dispatched_by: Number,
   dispatched_at: {
     type: Date,
   },
@@ -45,6 +35,7 @@ const shipmentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   },
+  legacy_received_by: Number,
   received_at: {
     type: Date,
   },
@@ -52,8 +43,8 @@ const shipmentSchema = new mongoose.Schema({
   created_by: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
   },
+  legacy_created_by: Number,
   createdAt: {
     type: Date,
     default: Date.now,
@@ -80,8 +71,6 @@ const shipmentSchema = new mongoose.Schema({
 });
 
 // Indexes
-shipmentSchema.index({ tracking_number: 1 }, { unique: true });
 shipmentSchema.index({ source_branch: 1, destination_branch: 1 });
-shipmentSchema.index({ status: 1 });
 
 module.exports = mongoose.model('Shipment', shipmentSchema);

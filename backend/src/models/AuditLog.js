@@ -12,7 +12,6 @@ const auditLogSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    index: true,
   },
   user_name: {
     type: String,
@@ -21,7 +20,6 @@ const auditLogSchema = new mongoose.Schema({
   action: {
     type: String,
     required: true,
-    index: true,
   },
   entity_type: {
     type: String,
@@ -42,8 +40,6 @@ const auditLogSchema = new mongoose.Schema({
 });
 
 // Indexes
-auditLogSchema.index({ action: 1 });
-auditLogSchema.index({ user_id: 1 });
 auditLogSchema.index({ entity_type: 1, entity_id: 1 });
 
 module.exports = mongoose.model('AuditLog', auditLogSchema);

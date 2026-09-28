@@ -6,47 +6,23 @@ const orderSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
-  orderID: {
-    type: String,
-    required: true,
-  },
-  facilityID: {
-    type: String,
-    required: true,
-    index: true,
-  },
+  orderID: String,
+  facilityID: String,
   stockID: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Stock',
-    required: true,
   },
-  item: {
-    type: String,
-    required: true,
-  },
-  quantity: {
-    type: Number,
-    required: true,
-  },
-  subtotal: {
-    type: Number,
-    required: true,
-  },
-  net_total: {
-    type: Number,
-    required: true,
-  },
+  item: String,
+  quantity: Number,
+  subtotal: Number,
+  net_total: Number,
   buyer_name: String,
   customer_name: String,
   customerID: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Customer',
   },
-  payment: {
-    type: String,
-    enum: ['cash', 'credit', 'transfer'],
-    required: true,
-  },
+  payment: String,
   discount: {
     type: Number,
     default: 0,
@@ -69,19 +45,12 @@ const orderSchema = new mongoose.Schema({
   },
   bank_name: String,
   staff: String,
-  status: {
-    type: String,
-    default: 'completed',
-  },
-  creation: {
-    type: Date,
-    required: true,
-    index: true,
-  },
+  status: String,
+  creation: Date,
 });
 
 // Indexes
-orderSchema.index({ orderID: 1, facilityID: 1 }, { unique: true });
+orderSchema.index({ orderID: 1, facilityID: 1 }); // Not unique - multiple line items per order
 orderSchema.index({ facilityID: 1, creation: -1 });
 orderSchema.index({ customerID: 1 });
 orderSchema.index({ creation: -1 });

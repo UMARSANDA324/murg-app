@@ -27,6 +27,6 @@ const counterSchema = new mongoose.Schema({
 });
 
 // Indexes
-counterSchema.index({ name: 1 }, { unique: true });
+// No additional indexes needed - name is already unique in schema
 
 module.exports = mongoose.model('Counter', counterSchema);

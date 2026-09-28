@@ -41,7 +41,7 @@ async function testUserMigration() {
           status: row.status,
           password_hash: row.password_hash,
         },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
       log(`  ✓ Migrated user: ${row.name} (${row.email})`);
     }
@@ -75,7 +75,7 @@ async function testBranchMigration() {
           status: row.status || 'active',
           sales_mode: row.sales_mode || 'DEALER',
         },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
       log(`  ✓ Migrated branch: ${row.name} (${row.facilityID})`);
     }
@@ -109,7 +109,7 @@ async function testStockMigration() {
           unit_type: row.unit_type || 'belt',
           status: row.status || 'active',
         },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
       log(`  ✓ Migrated stock: ${row.name} (qty: ${row.quantity})`);
     }

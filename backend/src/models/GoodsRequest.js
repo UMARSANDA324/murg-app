@@ -15,9 +15,8 @@ const goodsRequestSchema = new mongoose.Schema({
   staff_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true,
   },
+  legacy_staff_id: Number,
   staff_name: {
     type: String,
     required: true,
@@ -25,7 +24,6 @@ const goodsRequestSchema = new mongoose.Schema({
   requesting_branch: {
     type: String,
     required: true,
-    index: true,
   },
   stock_id: {
     type: mongoose.Schema.Types.ObjectId,
@@ -46,9 +44,8 @@ const goodsRequestSchema = new mongoose.Schema({
   reason: String,
   status: {
     type: String,
-    enum: ['PENDING', 'APPROVED', 'REJECTED', 'SHIPPING_CREATED', 'IN_TRANSIT', 'RECEIVED', 'CANCELLED'],
+    enum: ['PENDING', 'APPROVED', 'REJECTED', 'SHIPPING_CREATED', 'IN_TRANSIT', 'RECEIVED', 'RELEASED', 'CANCELLED'],
     default: 'PENDING',
-    index: true,
   },
   admin_notes: String,
   source_branch: String,
@@ -56,6 +53,7 @@ const goodsRequestSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Shipment',
   },
+  legacy_shipment_id: Number,
   reviewed_by: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -74,9 +72,6 @@ const goodsRequestSchema = new mongoose.Schema({
 });
 
 // Indexes
-goodsRequestSchema.index({ request_code: 1 }, { unique: true });
-goodsRequestSchema.index({ staff_id: 1 });
 goodsRequestSchema.index({ requesting_branch: 1 });
-goodsRequestSchema.index({ status: 1 });
 
 module.exports = mongoose.model('GoodsRequest', goodsRequestSchema);

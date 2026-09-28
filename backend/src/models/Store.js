@@ -14,7 +14,6 @@ const storeSchema = new mongoose.Schema({
   branch_id: {
     type: String,
     required: true,
-    index: true,
   },
   status: {
     type: String,

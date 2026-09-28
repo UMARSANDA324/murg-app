@@ -2,23 +2,14 @@ const mongoose = require('mongoose');
 
 const customerSchema = new mongoose.Schema({
   // Preserve MySQL ID for backward compatibility
-  mysqlId: {
-    type: Number,
-    unique: true,
-    required: true,
-  },
+  mysqlId: Number,
   name: {
     type: String,
     required: true,
   },
-  phone: {
-    type: String,
-    index: true,
-  },
+  phone: String,
   facilityID: {
     type: String,
-    required: true,
-    index: true,
   },
   address: String,
   createdAt: {

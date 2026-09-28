@@ -10,13 +10,10 @@ const debtSchema = new mongoose.Schema({
   customerID: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Customer',
-    required: true,
-    index: true,
   },
   facilityID: {
     type: String,
     required: true,
-    index: true,
   },
   balance: {
     type: Number,

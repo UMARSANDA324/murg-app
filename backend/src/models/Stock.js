@@ -14,12 +14,10 @@ const stockSchema = new mongoose.Schema({
   facilityID: {
     type: String,
     required: true,
-    index: true,
   },
   store_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Store',
-    index: true,
   },
   quantity: {
     type: Number,

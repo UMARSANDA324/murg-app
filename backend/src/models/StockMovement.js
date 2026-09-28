@@ -20,20 +20,10 @@ const stockMovementSchema = new mongoose.Schema({
     ref: 'Stock',
     required: true,
   },
-  movement_type: {
-    type: String,
-    enum: [
-      'STOCK_IN_SUPPLIER',
-      'STOCK_OUT_SALE',
-      'STOCK_IN_RETURN',
-      'STOCK_OUT_TRANSFER',
-      'STOCK_IN_TRANSFER',
-      'STOCK_ADJUSTMENT',
-      'STOCK_DAMAGE',
-    ],
-    required: true,
-    index: true,
-  },
+  movement_type: String,
+  quantity_change: Number,
+  quantity_before: Number,
+  quantity_after: Number,
   quantity_change: {
     type: Number,
     required: true,
@@ -58,7 +48,6 @@ const stockMovementSchema = new mongoose.Schema({
   performed_by: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
   },
   createdAt: {
     type: Date,

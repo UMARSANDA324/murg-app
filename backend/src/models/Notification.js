@@ -10,16 +10,9 @@ const notificationSchema = new mongoose.Schema({
   user_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    index: true,
   },
-  role_target: {
-    type: String,
-    index: true,
-  },
-  facility_id: {
-    type: String,
-    index: true,
-  },
+  role_target: String,
+  facility_id: String,
   title: {
     type: String,
     required: true,
@@ -36,7 +29,6 @@ const notificationSchema = new mongoose.Schema({
   is_read: {
     type: Boolean,
     default: false,
-    index: true,
   },
   createdAt: {
     type: Date,

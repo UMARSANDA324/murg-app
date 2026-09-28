@@ -11,7 +11,6 @@ const branchSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true,
-    index: true,
   },
   name: {
     type: String,
@@ -23,13 +22,11 @@ const branchSchema = new mongoose.Schema({
     type: String,
     enum: ['active', 'inactive'],
     default: 'active',
-    index: true,
   },
   sales_mode: {
     type: String,
     enum: ['DEALER', 'PER_YARD'],
     default: 'DEALER',
-    index: true,
   },
   createdAt: {
     type: Date,
@@ -42,8 +39,6 @@ const branchSchema = new mongoose.Schema({
 });
 
 // Indexes
-branchSchema.index({ facilityID: 1 }, { unique: true });
-branchSchema.index({ sales_mode: 1 });
-branchSchema.index({ status: 1 });
+// No additional indexes needed - facilityID is already unique in schema
 
 module.exports = mongoose.model('Branch', branchSchema);

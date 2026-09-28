@@ -10,8 +10,6 @@ const userSchema = new mongoose.Schema({
   facilityID: {
     type: String,
     required: true,
-    unique: true,
-    index: true,
   },
   name: String,
   fname: String,
@@ -21,14 +19,12 @@ const userSchema = new mongoose.Schema({
     unique: true,
     lowercase: true,
     trim: true,
-    index: true,
   },
   phone: String,
   role: {
     type: String,
     enum: ['Admin', 'Staff'],
     required: true,
-    index: true,
   },
   status: {
     type: Number,
@@ -51,7 +47,6 @@ const userSchema = new mongoose.Schema({
 });
 
 // Indexes
-userSchema.index({ facilityID: 1 }, { unique: true });
 userSchema.index({ role: 1 });
 
 module.exports = mongoose.model('User', userSchema);

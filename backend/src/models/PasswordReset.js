@@ -10,22 +10,16 @@ const passwordResetSchema = new mongoose.Schema({
   user_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true,
   },
   email: {
     type: String,
     required: true,
-    index: true,
   },
   otp_hash: {
     type: String,
     required: true,
   },
-  reset_token: {
-    type: String,
-    index: true,
-  },
+  reset_token: String,
   attempts: {
     type: Number,
     default: 0,
@@ -45,7 +39,6 @@ const passwordResetSchema = new mongoose.Schema({
   expires_at: {
     type: Date,
     required: true,
-    index: true,
   },
   createdAt: {
     type: Date,

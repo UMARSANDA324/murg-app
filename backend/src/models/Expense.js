@@ -7,25 +7,11 @@ const expenseSchema = new mongoose.Schema({
     unique: true,
     required: true,
   },
-  facilityID: {
-    type: String,
-    required: true,
-    index: true,
-  },
-  item: {
-    type: String,
-    required: true,
-  },
-  price: {
-    type: Number,
-    required: true,
-  },
+  facilityID: String,
+  item: String,
+  price: Number,
   type: String,
-  date: {
-    type: Date,
-    required: true,
-    index: true,
-  },
+  date: Date,
   createdAt: {
     type: Date,
     default: Date.now,

@@ -64,6 +64,6 @@ const shipmentReceiptSchema = new mongoose.Schema({
 });
 
 // Indexes
-shipmentReceiptSchema.index({ receipt_code: 1 }, { unique: true });
+shipmentReceiptSchema.index({ shipment_id: 1 });
 
 module.exports = mongoose.model('ShipmentReceipt', shipmentReceiptSchema);

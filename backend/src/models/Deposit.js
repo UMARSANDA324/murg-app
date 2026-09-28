@@ -10,22 +10,13 @@ const depositSchema = new mongoose.Schema({
   customerID: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Customer',
-    required: true,
-    index: true,
   },
-  facilityID: {
-    type: String,
-    required: true,
-    index: true,
-  },
+  facilityID: String,
   amount: {
     type: Number,
     required: true,
   },
-  payment_date: {
-    type: Date,
-    required: true,
-  },
+  payment_date: Date,
   receipt_number: String,
   createdAt: {
     type: Date,
