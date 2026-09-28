@@ -16,8 +16,9 @@ if (!MONGODB_URI) {
 }
 
 const mongoOptions = {
-  serverSelectionTimeoutMS: 5000,
+  serverSelectionTimeoutMS: 30000,
   socketTimeoutMS: 45000,
+  bufferCommands: false,
 };
 
 const connectDB = async () => {
