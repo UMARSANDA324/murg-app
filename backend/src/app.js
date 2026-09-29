@@ -4,6 +4,8 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 require('dotenv').config();
 
+const { connectDB, mongoose } = require('./config/mongodb');
+
 const authRoutes = require('./routes/authRoutes');
 const branchRoutes = require('./routes/branchRoutes');
 const staffRoutes = require('./routes/staffRoutes');
@@ -33,12 +35,27 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Initialize MongoDB connection
+if (process.env.MONGODB_URI) {
+  connectDB().catch(err => {
+    console.error('[APP] Failed to connect to MongoDB:', err.message);
+    // Don't exit - allow server to start but log the error
+  });
+} else {
+  console.warn('[APP] MONGODB_URI not set - MongoDB features will be disabled');
+}
+
 // Healthcheck
 app.get('/api/health', (req, res) => {
+  const mongoStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
   res.json({
     status: 'online',
     timestamp: new Date().toISOString(),
     service: 'murg-backend-api',
+    database: {
+      type: 'mongodb',
+      status: mongoStatus,
+    },
   });
 });
 
