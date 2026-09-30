@@ -11,7 +11,7 @@ export default function ReturnsPage() {
   const [validation, setValidation] = useState(null);
 
   const handleValidate = async () => {
-    const normalizedOrderId = orderID.trim();
+    const normalizedOrderId = orderID.trim().replace(/^#/, '');
     if (!normalizedOrderId) {
       setError('Please enter an order ID');
       return;
@@ -34,7 +34,7 @@ export default function ReturnsPage() {
   };
 
   const handleReturn = async () => {
-    const normalizedOrderId = orderID.trim();
+    const normalizedOrderId = orderID.trim().replace(/^#/, '');
     if (!normalizedOrderId) {
       setError('Please enter an order ID');
       return;
