@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -20,13 +20,11 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // Clear token and redirect to login if not already on login page
+    const isLoginRequest = /\/auth\/login(?:\?|$)/.test(error.config?.url || '');
+    if (error.response?.status === 401 && !isLoginRequest) {
       localStorage.removeItem('murg_token');
       localStorage.removeItem('murg_user');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
+      window.dispatchEvent(new Event('murg:auth-invalid'));
     }
     return Promise.reject(error);
   }

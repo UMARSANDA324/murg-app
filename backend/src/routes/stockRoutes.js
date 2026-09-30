@@ -4,6 +4,7 @@ const stockController = require('../controllers/stockController');
 const {
   authenticate,
   requireBranchScope,
+  requireAdmin,
   requireAdminPriceControl,
 } = require('../middleware/auth');
 
@@ -17,9 +18,9 @@ router.get('/catalog', stockController.catalogSearch);
 
 // ─── Store management (authenticate only, branch scope in controller) ───────
 router.get('/stores', stockController.getStores);
-router.post('/stores', stockController.createStore);
-router.put('/stores/:id', stockController.updateStore);
-router.delete('/stores/:id', stockController.deleteStore);
+router.post('/stores', requireAdmin, stockController.createStore);
+router.put('/stores/:id', requireAdmin, stockController.updateStore);
+router.delete('/stores/:id', requireAdmin, stockController.deleteStore);
 router.get('/purchases/history', stockController.getPurchaseHistory);
 router.get('/purchases/totals', stockController.getPurchaseTotals);
 

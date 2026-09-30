@@ -14,10 +14,24 @@ import {
   Banknote,
 } from 'lucide-react';
 
+function useDebounce(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+  return debouncedValue;
+}
+
 export default function CustomersPage() {
   const { activeBranch } = useBranchStore();
   const [customers, setCustomers] = useState([]);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 400);
   const [loading, setLoading] = useState(false);
 
   // New Customer Modal
@@ -45,13 +59,13 @@ export default function CustomersPage() {
     if (activeBranch) {
       fetchCustomers();
     }
-  }, [activeBranch]);
+  }, [activeBranch, debouncedSearch]);
 
   const fetchCustomers = async () => {
     setLoading(true);
     try {
       let url = `/customers?branchId=${activeBranch}`;
-      if (search) url += `&search=${encodeURIComponent(search)}`;
+      if (debouncedSearch) url += `&search=${encodeURIComponent(debouncedSearch)}`;
       const res = await api.get(url);
       setCustomers(res.data.data || []);
     } catch (err) {
@@ -155,7 +169,6 @@ export default function CustomersPage() {
             placeholder="Search customers by name or phone..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && fetchCustomers()}
             className="w-full bg-slate-50 border border-slate-300 rounded-lg py-2 pl-9 pr-3 text-sm focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
           />
         </div>

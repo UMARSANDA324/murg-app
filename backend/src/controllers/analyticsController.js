@@ -24,7 +24,7 @@ class AnalyticsController {
       }
       
       // Get date boundaries from database
-      const dateBounds = await analyticsRepo.getDateBoundaries();
+      const dateBounds = await analyticsRepo.getDateBoundaries(req.query.date || null);
       
       const metrics = await analyticsRepo.getSalesActivity({
         facilityID,
@@ -51,6 +51,9 @@ class AnalyticsController {
         },
       });
     } catch (err) {
+      if (err instanceof TypeError) {
+        return error(res, err.message, 400);
+      }
       next(err);
     }
   }

@@ -1,7 +1,10 @@
 const jwt = require('jsonwebtoken');
-const db = require('../config/database');
+const mongoose = require('mongoose');
+const { User } = require('../models');
 const { unauthorized, forbidden } = require('../utils/responseUtils');
 const { JWT_SECRET } = require('../config/auth');
+const { mongoose: appMongoose } = require('../config/mongodb');
+const { recordAuditLog } = require('../services/auditLogService');
 
 /**
  * Verify JWT and attach user to req.user.
@@ -27,26 +30,28 @@ async function authenticate(req, res, next) {
     }
 
     const decoded = jwt.verify(token, JWT_SECRET);
+    if (!mongoose.Types.ObjectId.isValid(decoded.sub)) {
+      return unauthorized(res, 'Invalid authentication token.');
+    }
 
-    // Re-verify user still exists and is active in database
-    const [rows] = await db.query(
-      'SELECT id, facilityID, name, email, role, status, permissions FROM facility WHERE id = ? AND status = 1',
-      [decoded.sub]
-    );
+    const user = await User.findById(decoded.sub)
+      .select('-password -password_hash')
+      .lean();
 
-    if (rows.length === 0) {
+    if (!user || user.status !== 1) {
       return unauthorized(res, 'Account not found or suspended.');
     }
 
-    const user = rows[0];
     req.user = {
-      id: user.id,
+      id: user._id.toString(),
       name: user.name,
       email: user.email,
       role: user.role,
       facilityID: user.facilityID,
       isGlobalAdmin: user.role === 'Admin',
-      permissions: user.permissions ? JSON.parse(user.permissions) : [],
+      permissions: user.role === 'Admin'
+        ? ['*']
+        : (Array.isArray(user.permissions) ? user.permissions.filter((permission) => permission !== '*') : []),
     };
 
     next();
@@ -58,7 +63,7 @@ async function authenticate(req, res, next) {
       return unauthorized(res, 'Invalid authentication token.');
     }
     console.error('[Auth Middleware] Error:', err.message);
-    return unauthorized(res, 'Authentication failed.');
+    return next(err);
   }
 }
 
@@ -131,19 +136,29 @@ async function requireAdminPriceControl(req, res, next) {
   const user = req.user;
   if (!user || user.role !== 'Admin') {
     // Log unauthorized price change attempt
+    const session = await appMongoose.startSession();
     try {
-      await db.query(
-        `INSERT INTO audit_logs (facilityID, user_id, user_name, action, entity_type, entity_id, old_values, ip_address)
-         VALUES (?, ?, ?, 'UNAUTHORIZED_PRICE_CHANGE_ATTEMPT', 'stocks', ?, '{}', ?)`,
-        [
-          user?.facilityID || 'unknown',
-          user?.id || 0,
-          user?.name || 'unknown',
-          req.params.id || 'unknown',
-          req.ip,
-        ]
-      );
-    } catch (_) { /* don't fail the response due to log error */ }
+      await session.withTransaction(async () => recordAuditLog({
+        facilityID: user?.facilityID || 'unknown',
+        user_id: user?.id,
+        user_name: user?.name || 'unknown',
+        action: 'UNAUTHORIZED_PRICE_CHANGE_ATTEMPT',
+        entity_type: 'stocks',
+        entity_id: req.params.id || 'unknown',
+        old_values: {},
+        ip_address: req.ip,
+      }, session));
+    } catch (auditError) {
+      console.error('[AUTH_AUDIT_FAILURE]', {
+        method: req.method,
+        endpoint: req.originalUrl,
+        userId: user?.id || null,
+        branchId: user?.facilityID || null,
+        error: auditError.message,
+      });
+    } finally {
+      await session.endSession();
+    }
 
     return forbidden(
       res,

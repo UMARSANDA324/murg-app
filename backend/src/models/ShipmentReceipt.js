@@ -12,6 +12,11 @@ const shipmentReceiptSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  receipt_type: {
+    type: String,
+    enum: ['DISPATCH', 'RECEIVING'],
+    default: 'DISPATCH',
+  },
   shipment_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Shipment',
@@ -57,6 +62,11 @@ const shipmentReceiptSchema = new mongoose.Schema({
   consumed_at: {
     type: Date,
   },
+  consumed_by: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  consumed_by_name: String,
   createdAt: {
     type: Date,
     default: Date.now,

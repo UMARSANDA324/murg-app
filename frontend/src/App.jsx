@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/useAuthStore';
 import DashboardLayout from './layouts/DashboardLayout';
@@ -15,11 +15,12 @@ import BranchesPage from './pages/BranchesPage';
 import ManagementPage from './pages/ManagementPage';
 import ExpensesPage from './pages/ExpensesPage';
 import ReturnsPage from './pages/ReturnsPage';
-import StoresPage from './pages/StoresPage';
+import NotFoundPage from './pages/NotFoundPage';
 
 function ProtectedRoute({ children, adminOnly = false }) {
-  const { isAuthenticated, user } = useAuthStore();
+  const { authReady, isAuthenticated, user } = useAuthStore();
 
+  if (!authReady) return null;
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
@@ -32,6 +33,27 @@ function ProtectedRoute({ children, adminOnly = false }) {
 }
 
 export default function App() {
+  const { authReady, authError, isAuthenticated, restoreSession } = useAuthStore();
+
+  useEffect(() => {
+    restoreSession();
+  }, [restoreSession]);
+
+  if (!authReady && authError) {
+    return (
+      <div role="alert" className="min-h-screen grid place-items-center p-6">
+        <div className="text-center">
+          <p>{authError}</p>
+          <button type="button" onClick={restoreSession}>Retry</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authReady) {
+    return <div role="status" className="min-h-screen grid place-items-center">Restoring session...</div>;
+  }
+
   return (
     <BrowserRouter>
       <Routes>
@@ -47,6 +69,7 @@ export default function App() {
           }
         >
           <Route index element={<DashboardPage />} />
+          <Route path="dashboard" element={<DashboardPage />} />
           <Route path="pos" element={<POSTerminalPage />} />
           <Route path="stock" element={<StockPage />} />
           <Route path="shipments" element={<ShipmentsPage />} />
@@ -78,17 +101,9 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="stores"
-            element={
-              <ProtectedRoute adminOnly>
-                <StoresPage />
-              </ProtectedRoute>
-            }
-          />
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   );

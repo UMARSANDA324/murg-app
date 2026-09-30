@@ -11,7 +11,8 @@ export default function ReturnsPage() {
   const [validation, setValidation] = useState(null);
 
   const handleValidate = async () => {
-    if (!orderID.trim()) {
+    const normalizedOrderId = orderID.trim().replace(/^#/, '');
+    if (!normalizedOrderId) {
       setError('Please enter an order ID');
       return;
     }
@@ -22,7 +23,7 @@ export default function ReturnsPage() {
     setValidation(null);
 
     try {
-      const response = await api.get(`/returns/validate/${orderID}`);
+      const response = await api.get(`/returns/validate/${encodeURIComponent(normalizedOrderId)}`);
       setValidation(response.data.data);
       setSuccess('Order can be returned');
     } catch (err) {
@@ -33,7 +34,8 @@ export default function ReturnsPage() {
   };
 
   const handleReturn = async () => {
-    if (!orderID.trim()) {
+    const normalizedOrderId = orderID.trim().replace(/^#/, '');
+    if (!normalizedOrderId) {
       setError('Please enter an order ID');
       return;
     }
@@ -43,7 +45,7 @@ export default function ReturnsPage() {
     setSuccess(null);
 
     try {
-      const response = await api.post('/returns/process', { orderID });
+      const response = await api.post('/returns/process', { orderID: normalizedOrderId });
       setSuccess(response.data.message);
       setOrderID('');
       setValidation(null);
@@ -63,7 +65,7 @@ export default function ReturnsPage() {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Order Returns</h1>
-        <p className="text-gray-600">Return completed orders to cart and restore stock</p>
+        <p className="text-gray-600">Record a return, restore eligible stock, and retain the original sale history</p>
       </div>
 
       {error && (
@@ -79,14 +81,15 @@ export default function ReturnsPage() {
       )}
 
       <div className="bg-white p-6 rounded-lg shadow max-w-2xl">
-        <h2 className="text-xl font-bold mb-4">Return Order to Cart</h2>
+        <h2 className="text-xl font-bold mb-4">Record Order Return</h2>
 
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Enter Invoice Number <span className="text-red-500">*</span>
           </label>
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
             value={orderID}
             onChange={(e) => setOrderID(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -107,7 +110,7 @@ export default function ReturnsPage() {
             disabled={loading || !validation}
             className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition disabled:opacity-50"
           >
-            {loading ? 'Processing...' : 'Return to Cart'}
+            {loading ? 'Processing...' : 'Process Return'}
           </button>
         </div>
 

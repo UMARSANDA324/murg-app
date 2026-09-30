@@ -1,4 +1,4 @@
-const notificationRepo = require('../repositories/notificationRepository');
+const notificationRepo = require('../repositories/notificationRepositoryMongo');
 const { success } = require('../utils/responseUtils');
 
 class NotificationController {
@@ -19,6 +19,7 @@ class NotificationController {
 
       return success(res, notifications);
     } catch (err) {
+      console.error('[NOTIFICATIONS] Failed to get notifications:', err.message);
       next(err);
     }
   }
@@ -37,6 +38,7 @@ class NotificationController {
 
       return success(res, { unreadCount });
     } catch (err) {
+      console.error('[NOTIFICATIONS] Failed to get unread count:', err.message);
       next(err);
     }
   }
@@ -58,6 +60,7 @@ class NotificationController {
 
       return success(res, null, 'Notification marked as read');
     } catch (err) {
+      console.error('[NOTIFICATIONS] Failed to mark notification as read:', err.message);
       next(err);
     }
   }
@@ -83,6 +86,7 @@ class NotificationController {
 
       return success(res, { unreadCount }, 'All notifications marked as read');
     } catch (err) {
+      console.error('[NOTIFICATIONS] Failed to mark all as read:', err.message);
       next(err);
     }
   }
@@ -108,13 +112,8 @@ class NotificationController {
         return success(res, { unreadCount }, 'No notifications to mark');
       }
 
-      // Sanitize IDs — must be integers
-      const safeIds = ids.map((id) => parseInt(id)).filter((id) => !isNaN(id) && id > 0);
-      if (safeIds.length === 0) {
-        return success(res, { unreadCount: 0 }, 'No valid notification IDs provided');
-      }
-
-      await notificationRepo.markListAsRead(safeIds, {
+      // Mark each notification as read (scoped to user in repository)
+      await notificationRepo.markListAsRead(ids, {
         userId: user.id,
         role: user.role,
         facilityId: user.facilityID,
@@ -129,6 +128,7 @@ class NotificationController {
 
       return success(res, { unreadCount }, 'Notifications marked as read');
     } catch (err) {
+      console.error('[NOTIFICATIONS] Failed to mark list as read:', err.message);
       next(err);
     }
   }

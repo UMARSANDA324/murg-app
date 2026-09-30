@@ -3,6 +3,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { useBranchStore } from '../store/useBranchStore';
 import api from '../services/api';
+import { formatDate } from '../utils/dateUtils';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -25,7 +26,6 @@ import {
   Info,
   DollarSign,
   Undo2,
-  Store,
 } from 'lucide-react';
 
 // ─── Notification type → icon + nav destination ───────────────────────────────
@@ -58,12 +58,16 @@ export default function DashboardLayout() {
   const [notifications, setNotifications] = useState([]);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const [markingRead, setMarkingRead] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsError, setNotificationsError] = useState(null);
 
   // Ref for click-outside detection
   const notifRef = useRef(null);
 
   // ── Fetch notifications + unread count ────────────────────────────────────
   const fetchNotificationData = useCallback(async () => {
+    setNotificationsLoading(true);
+    setNotificationsError(null);
     try {
       const [countRes, listRes] = await Promise.all([
         api.get('/notifications/unread-count'),
@@ -71,8 +75,12 @@ export default function DashboardLayout() {
       ]);
       setUnreadCount(countRes.data.data?.unreadCount || 0);
       setNotifications(listRes.data.data || []);
-    } catch (_) {
-      // Quiet fail — polling will retry
+    } catch (err) {
+      console.error('[Notifications] Failed to fetch notification data:', err);
+      setNotificationsError('Failed to load notifications');
+      // Don't clear existing data on error - polling will retry
+    } finally {
+      setNotificationsLoading(false);
     }
   }, []);
 
@@ -213,7 +221,6 @@ export default function DashboardLayout() {
   if (user?.isGlobalAdmin || user?.role === 'Admin') {
     navItems.push({ label: 'Staff & Roles', path: '/staff', icon: UserCheck });
     navItems.push({ label: 'Branch Management', path: '/branches', icon: Building2 });
-    navItems.push({ label: 'Store Management', path: '/stores', icon: Store });
     navItems.push({ label: 'Management', path: '/management', icon: ShieldCheck });
   }
 
@@ -372,7 +379,16 @@ export default function DashboardLayout() {
                     role="list"
                     aria-label="Notification items"
                   >
-                    {notifications.length === 0 ? (
+                    {notificationsLoading ? (
+                      <div className="p-8 text-center text-slate-400">
+                        <p className="font-medium">Loading notifications...</p>
+                      </div>
+                    ) : notificationsError ? (
+                      <div className="p-8 text-center text-rose-500">
+                        <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
+                        <p className="font-medium">{notificationsError}</p>
+                      </div>
+                    ) : notifications.length === 0 ? (
                       <div className="p-8 text-center text-slate-400">
                         <Bell className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                         <p className="font-medium">No notifications yet.</p>
@@ -411,7 +427,7 @@ export default function DashboardLayout() {
                                 {n.message}
                               </p>
                               <span className="text-[10px] text-slate-400 m-0 mt-1 block">
-                                {new Date(n.created_at).toLocaleString('en-GB')}
+                                {formatDate(n.created_at)}
                               </span>
                             </div>
                           </div>

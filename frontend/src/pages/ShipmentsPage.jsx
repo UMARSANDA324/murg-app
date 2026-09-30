@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import { useBranchStore } from '../store/useBranchStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { formatDateString } from '../utils/dateUtils';
 import {
   Truck,
   Plus,
@@ -82,7 +83,7 @@ export default function ShipmentsPage() {
         destinationBranch: destBranch,
         items: [
           {
-            stockId: parseInt(selectedStockId),
+            stockId: selectedStockId,
             quantity: parseFloat(sendQuantity),
           },
         ],
@@ -219,7 +220,7 @@ export default function ShipmentsPage() {
                   </td>
                   <td className="py-3 px-4 text-slate-500">{s.dispatched_by_name || 'Staff'}</td>
                   <td className="py-3 px-4 text-slate-500">
-                    {new Date(s.created_at).toLocaleDateString()}
+                    {formatDateString(s.created_at)}
                   </td>
                   <td className="py-3 px-4 text-center">
                     {isPendingReceive ? (

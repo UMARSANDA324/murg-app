@@ -1,4 +1,4 @@
-const shipmentRepo = require('../repositories/shipmentRepository');
+const shipmentRepo = require('../repositories/shipmentRepositoryMongo');
 const { publishBranchEvent } = require('../services/realtimeService');
 const { success, created, error, notFound } = require('../utils/responseUtils');
 
@@ -66,11 +66,11 @@ class ShipmentController {
       const result = await shipmentRepo.createAndDispatch({
         sourceBranch: effectiveSource,
         destinationBranch,
-        sourceStoreId: sourceStoreId ? parseInt(sourceStoreId) : null,
-        destinationStoreId: destinationStoreId ? parseInt(destinationStoreId) : null,
+        sourceStoreId: sourceStoreId || null,
+        destinationStoreId: destinationStoreId || null,
         items: items.map(i => ({
-          stockId: parseInt(i.stockId),
-          quantity: parseFloat(i.quantity),
+          stockId: String(i.stockId),
+          quantity: Number(i.quantity),
         })),
         notes: notes ? notes.trim() : '',
         userId: req.user.id,

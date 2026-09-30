@@ -2,6 +2,14 @@
 # Add these variables to your backend/.env file
 
 # Database Configuration
+# MongoDB Atlas (Primary Database)
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/murg?retryWrites=true&w=majority
+
+# MongoDB Test Database (Isolated for integration tests)
+# MUST resolve exactly to murg_test - safety guard will reject any other database
+MONGODB_TEST_URI=mongodb+srv://username:password@cluster.mongodb.net/murg_test?retryWrites=true&w=majority
+
+# MySQL (Legacy - for migration scripts only, not runtime)
 DB_HOST=localhost
 DB_USER=root
 DB_PASS=
@@ -10,7 +18,7 @@ DB_PORT=3306
 
 # JWT Configuration
 JWT_SECRET=murg_fallback_secret_change_in_production
-JWT_EXPIRES_IN=7d
+JWT_EXPIRES_IN=200d
 
 # Server Configuration
 PORT=5000

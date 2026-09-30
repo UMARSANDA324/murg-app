@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import api from '../services/api';
 
 export function useBranchRealtime(branchId, onInvalidate) {
   const branchIds = Array.isArray(branchId) ? branchId.filter(Boolean) : [branchId].filter(Boolean);
@@ -33,7 +34,8 @@ export function useBranchRealtime(branchId, onInvalidate) {
         const controller = new AbortController();
         controllers[index] = controller;
         const token = localStorage.getItem('murg_token');
-        const response = await fetch(`/api/realtime/branch?branchId=${encodeURIComponent(currentBranchId)}`, {
+        const baseURL = api.defaults.baseURL || '/api';
+        const response = await fetch(`${baseURL}/realtime/branch?branchId=${encodeURIComponent(currentBranchId)}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
           signal: controller.signal,
         });

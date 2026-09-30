@@ -9,19 +9,15 @@ require('dotenv').config();
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
-if (!MONGODB_URI) {
-  console.warn('[MongoDB] MONGODB_URI environment variable not set. MongoDB features will be disabled.');
-  module.exports = { connectDB: null, mongoose: null };
-  return;
-}
-
 const mongoOptions = {
   serverSelectionTimeoutMS: 30000,
   socketTimeoutMS: 45000,
-  bufferCommands: false,
 };
 
 const connectDB = async () => {
+  if (!MONGODB_URI) {
+    throw new Error('MONGODB_URI is required to connect the application database.');
+  }
   try {
     const conn = await mongoose.connect(MONGODB_URI, mongoOptions);
     console.log('[MongoDB] Connected to MongoDB Atlas successfully');
@@ -30,8 +26,7 @@ const connectDB = async () => {
     return conn;
   } catch (err) {
     console.error('[MongoDB] Failed to connect to MongoDB Atlas:', err.message);
-    console.error('[MongoDB] Error details:', err);
-    process.exit(1);
+    throw err;
   }
 };
 

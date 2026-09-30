@@ -1,4 +1,4 @@
-const expenseRepo = require('../repositories/expenseRepository');
+const expenseRepo = require('../repositories/expenseRepositoryMongo');
 const { success, error, forbidden, notFound } = require('../utils/responseUtils');
 
 class ExpenseController {

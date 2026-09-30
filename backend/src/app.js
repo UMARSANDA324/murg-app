@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const { randomUUID } = require('crypto');
 require('dotenv').config();
 
 const { connectDB, mongoose } = require('./config/mongodb');
@@ -27,10 +28,20 @@ const app = express();
 
 // Security and utility middleware
 app.use(helmet());
+const configuredCorsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    const isLocalDevelopmentOrigin = process.env.NODE_ENV !== 'production'
+      && /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(origin || '');
+    callback(null, !origin || origin === configuredCorsOrigin || isLocalDevelopmentOrigin);
+  },
   credentials: true,
 }));
+app.use((req, res, next) => {
+  req.requestId = randomUUID();
+  res.setHeader('X-Request-ID', req.requestId);
+  next();
+});
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -45,7 +56,27 @@ if (process.env.MONGODB_URI) {
   console.warn('[APP] MONGODB_URI not set - MongoDB features will be disabled');
 }
 
-// Healthcheck
+// Root endpoint - API info and health status
+app.get('/', (req, res) => {
+  const mongoStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+  res.json({
+    success: true,
+    message: 'MURG Backend API',
+    version: '1.0.0',
+    environment: process.env.NODE_ENV || 'development',
+    endpoints: {
+      health: '/api/health',
+      api: '/api',
+    },
+    service: 'murg-backend-api',
+    database: {
+      type: 'mongodb',
+      status: mongoStatus,
+    },
+  });
+});
+
+// Healthcheck endpoint
 app.get('/api/health', (req, res) => {
   const mongoStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
   res.json({
