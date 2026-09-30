@@ -21,6 +21,7 @@ const PasswordReset = require('./PasswordReset');
 const ShipmentReceipt = require('./ShipmentReceipt');
 const AuditLog = require('./AuditLog');
 const Counter = require('./Counter');
+const Return = require('./Return');
 
 module.exports = {
   User,
@@ -41,4 +42,5 @@ module.exports = {
   ShipmentReceipt,
   AuditLog,
   Counter,
+  Return,
 };

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { useAuthStore } from '../store/useAuthStore';
 import { useBranchRealtime } from '../hooks/useBranchRealtime';
+import { formatDate } from '../utils/dateUtils';
 import {
   ShieldCheck,
   Building2,
@@ -16,7 +17,6 @@ import {
   Warehouse,
   RotateCcw,
   Activity,
-  ExternalLink,
   RefreshCw,
   AlertCircle,
   ChevronRight,
@@ -30,14 +30,12 @@ import {
 
 export default function ManagementPage() {
   const { user } = useAuthStore();
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'legacy', 'audit'
+  const [activeTab, setActiveTab] = useState('overview');
   const [overview, setOverview] = useState(null);
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditTotal, setAuditTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [launchingModule, setLaunchingModule] = useState(null);
-  const [bridgeError, setBridgeError] = useState(null);
   const [auditActionFilter, setAuditActionFilter] = useState('');
 
   const fetchOverview = async (showLoading = true) => {
@@ -72,22 +70,6 @@ export default function ManagementPage() {
 
   const managementBranchIds = overview?.branches?.list?.map((branch) => branch.facilityID) || [];
   useBranchRealtime(managementBranchIds, () => fetchOverview(false));
-
-  const handleLaunchLegacy = async (targetPath, title) => {
-    setLaunchingModule(title);
-    setBridgeError(null);
-    try {
-      const res = await api.post('/management/bridge-ticket', { targetPath });
-      const { bridgeUrl } = res.data.data;
-      window.open(bridgeUrl, '_blank', 'noopener,noreferrer');
-    } catch (err) {
-      console.error('Bridge ticket failed:', err);
-      const msg = err.response?.data?.message || 'Failed to authenticate legacy session.';
-      setBridgeError(`Error launching ${title}: ${msg}`);
-    } finally {
-      setLaunchingModule(null);
-    }
-  };
 
   const modernModules = [
     {
@@ -217,13 +199,6 @@ export default function ManagementPage() {
           <span>Refresh Metrics</span>
         </button>
       </div>
-
-      {bridgeError && (
-        <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{bridgeError}</span>
-        </div>
-      )}
 
       {/* Main Required Business Metrics Overview Grid (6 Core Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -410,7 +385,7 @@ export default function ManagementPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {overview?.branches?.list?.map((b) => (
-                <div key={b.id} className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/50 flex flex-col justify-between">
+                <div key={b.facilityID} className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/50 flex flex-col justify-between">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-900 truncate">{b.name}</span>
                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
@@ -530,7 +505,7 @@ export default function ManagementPage() {
                     return (
                       <tr key={log.id} className={isAlert ? 'bg-rose-50/50' : 'hover:bg-slate-50/60'}>
                         <td className="py-2.5 px-4 font-mono text-slate-500 whitespace-nowrap">
-                          {new Date(log.created_at).toLocaleString()}
+                          {formatDate(log.created_at)}
                         </td>
                         <td className="py-2.5 px-4">
                           <span

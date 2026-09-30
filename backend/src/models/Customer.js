@@ -7,6 +7,8 @@ const customerSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  email: String,
+  gender: String,
   phone: String,
   facilityID: {
     type: String,

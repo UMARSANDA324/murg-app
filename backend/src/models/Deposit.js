@@ -18,6 +18,9 @@ const depositSchema = new mongoose.Schema({
   },
   payment_date: Date,
   receipt_number: String,
+  payment_method: String,
+  description: String,
+  processed_by_name: String,
   createdAt: {
     type: Date,
     default: Date.now,

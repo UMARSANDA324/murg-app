@@ -1,5 +1,6 @@
 const { Order, Stock, Branch, Customer, Debt, StockMovement, Store } = require('../models');
 const { mongoose } = require('../config/mongodb');
+const { reserveLegacyIds } = require('../services/legacyIdService');
 
 /**
  * SalesRepositoryMongo — MongoDB-based atomic POS checkout operations.
@@ -186,7 +187,14 @@ class SalesRepositoryMongo {
 
       // Check branch sales_mode
       const branch = await Branch.findOne({ facilityID }).session(session).lean();
+      if (!branch) throw new Error('Branch not found.');
       const isPerYardBranch = branch?.sales_mode === 'PER_YARD';
+
+      if (customerID) {
+        if (!mongoose.Types.ObjectId.isValid(customerID) || !await Customer.exists({ _id: customerID, facilityID }).session(session)) {
+          throw new Error('Customer not found in this branch.');
+        }
+      }
 
       // Phase 1: Lock stock rows, validate stock levels, and enforce authoritative prices
       const validatedItems = [];
@@ -246,12 +254,14 @@ class SalesRepositoryMongo {
       }
 
       const orderID = `${Date.now()}${Math.floor(Math.random() * 90) + 10}`;
+      const orderMysqlIds = await reserveLegacyIds(Order, 'orderId', validatedItems.length, session);
+      const movementMysqlIds = await reserveLegacyIds(StockMovement, 'stockMovementId', validatedItems.length, session);
       const totalPaid = (parseFloat(payment.cash) || 0) + (parseFloat(payment.pos) || 0) + (parseFloat(payment.transfer) || 0);
       const netTotal = Math.max(0, grossTotal - globalDiscount - totalItemDiscounts);
       const paymentType = isCredit ? 'credit' : 'Split Payment';
 
       // Phase 2: Deduct stock atomically and insert order line items
-      for (const item of validatedItems) {
+      for (const [index, item] of validatedItems.entries()) {
         const qtyBefore = item.available;
         const qtyAfter = item.available - item.quantity;
 
@@ -264,7 +274,7 @@ class SalesRepositoryMongo {
           { session }
         );
 
-        if (updateResult.modifiedCount === 0) {
+        if (!updateResult.matchedCount) {
           throw new Error(`Insufficient stock for "${item.name}". Race condition prevented sale.`);
         }
 
@@ -294,7 +304,7 @@ class SalesRepositoryMongo {
             pos: payment.pos,
             transfer: payment.transfer,
             creation: new Date(),
-            mysqlId: Date.now(),
+            mysqlId: orderMysqlIds[index],
           }],
           { session }
         );
@@ -313,7 +323,7 @@ class SalesRepositoryMongo {
             reference_id: orderID,
             notes: `Sale to ${buyerName || customerName || 'Retail'}`,
             performed_by: staffID,
-            mysqlId: Date.now(),
+            mysqlId: movementMysqlIds[index],
           }],
           { session }
         );
@@ -334,6 +344,7 @@ class SalesRepositoryMongo {
               { session }
             );
           } else {
+            const [debtMysqlId] = await reserveLegacyIds(Debt, 'debtId', 1, session);
             await Debt.create(
               [{
                 customerID,
@@ -343,7 +354,7 @@ class SalesRepositoryMongo {
                 staff: staffName,
                 amount: totalPaid,
                 balance: creditBalance,
-                mysqlId: Date.now(),
+                mysqlId: debtMysqlId,
               }],
               { session }
             );

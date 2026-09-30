@@ -1,4 +1,4 @@
-const { Branch, User, Stock, Order, Debt, Shipment, Purchase } = require('../models');
+const { Branch, User, Stock, Order, Debt, Shipment, Purchase, Counter } = require('../models');
 const { mongoose } = require('../config/mongodb');
 
 /**
@@ -11,7 +11,7 @@ class BranchRepositoryMongo {
    */
   async findAll(facilityID = null) {
     const query = facilityID ? { facilityID } : {};
-    const branches = await Branch.find(query).lean();
+    const branches = await Branch.find(query).sort({ mysqlId: 1, facilityID: 1 }).lean();
 
     // Add staff count for each branch
     const result = await Promise.all(
@@ -36,45 +36,37 @@ class BranchRepositoryMongo {
    */
   async create({ name, address, phone, sales_mode = 'DEALER' }) {
     const session = await mongoose.startSession();
+    let createdBranch;
     try {
-      session.startTransaction();
+      await session.withTransaction(async () => {
+        // Use atomic counter increment
+        const counter = await Counter.findOneAndUpdate(
+          { name: 'facilityID' },
+          { $inc: { lastID: 1 } },
+          { new: true, upsert: true, session }
+        ).lean();
 
-      // Lock and increment counter
-      let counter = await Counter.findOne({ name: 'facilityID' }).session(session);
-      let newID, facilityID;
+        const newID = counter.lastID;
+        const facilityID = `MURG/${String(newID).padStart(3, '0')}`;
+        const validMode = sales_mode === 'PER_YARD' ? 'PER_YARD' : 'DEALER';
 
-      if (!counter) {
-        // Initialize counter if not exists
-        counter = await Counter.create(
-          [{ name: 'facilityID', lastID: 1, mysqlId: 1 }],
-          { session }
-        );
-        newID = 1;
-        facilityID = `MURG/${String(newID).padStart(3, '0')}`;
-      } else {
-        newID = counter.lastID + 1;
-        facilityID = `MURG/${String(newID).padStart(3, '0')}`;
-        await Counter.updateOne({ name: 'facilityID' }, { lastID: newID }, { session });
-      }
-
-      const validMode = sales_mode === 'PER_YARD' ? 'PER_YARD' : 'DEALER';
-      const branch = await Branch.create(
-        [
-          {
+        const [branch] = await Branch.create(
+          [{
             facilityID,
             name,
             address: address || null,
             phone: phone || null,
             sales_mode: validMode,
             status: 'active',
-            mysqlId: counter ? counter.lastID : 1,
-          },
-        ],
-        { session }
-      );
+            mysqlId: newID,
+          }],
+          { session }
+        );
 
-      await session.commitTransaction();
-      return { insertId: branch[0]._id, facilityID, sales_mode: validMode };
+        createdBranch = { insertId: branch._id, facilityID, sales_mode: validMode };
+      });
+
+      return createdBranch;
     } catch (err) {
       await session.abortTransaction();
       throw err;
@@ -92,7 +84,7 @@ class BranchRepositoryMongo {
       updateData.sales_mode = sales_mode === 'PER_YARD' ? 'PER_YARD' : 'DEALER';
     }
     const result = await Branch.updateOne({ facilityID }, updateData);
-    return result.modifiedCount > 0;
+    return result.matchedCount > 0;
   }
 
   /**
@@ -100,7 +92,7 @@ class BranchRepositoryMongo {
    */
   async setStatus(facilityID, status) {
     const result = await Branch.updateOne({ facilityID }, { status });
-    return result.modifiedCount > 0;
+    return result.matchedCount > 0;
   }
 
   /**
@@ -112,10 +104,14 @@ class BranchRepositoryMongo {
     const salesMode = branchInfo.sales_mode || 'DEALER';
 
     // Today's sales
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const businessDateParts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date());
+    const businessDate = Object.fromEntries(businessDateParts.map(({ type, value }) => [type, value]));
+    const today = new Date(Date.UTC(
+      Number(businessDate.year), Number(businessDate.month) - 1, Number(businessDate.day), -1
+    ));
+    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
 
     const todaySales = await Order.aggregate([
       {
@@ -127,26 +123,36 @@ class BranchRepositoryMongo {
       {
         $group: {
           _id: '$orderID',
-          order_count: { $sum: 1 },
+          order_count: { $first: 1 },
           gross_sales: { $sum: '$subtotal' },
-          total_discount: { $sum: '$discount' },
+          total_discount: { $first: '$discount' },
           credit_sales: {
-            $sum: {
+            $first: {
               $cond: [
-                { $or: [{ $eq: ['$payment', 'credit'] }, { $eq: ['$status', 0 }] }],
+                {
+                  $or: [
+                    { $eq: [{ $toLower: { $ifNull: [{ $toString: '$payment' }, ''] } }, 'credit'] },
+                    { $eq: [{ $convert: { input: '$status', to: 'int', onError: null, onNull: null } }, 0] },
+                  ],
+                },
                 '$net_total',
-                0,
-              ],
-            },
+                0
+              ]
+            }
           },
           cash_sales: {
-            $sum: {
+            $first: {
               $cond: [
-                { $and: [{ $ne: ['$payment', 'credit'] }, { $eq: ['$status', 1] }] },
+                {
+                  $and: [
+                    { $ne: [{ $toLower: { $ifNull: [{ $toString: '$payment' }, ''] } }, 'credit'] },
+                    { $eq: [{ $convert: { input: '$status', to: 'int', onError: null, onNull: null } }, 1] },
+                  ],
+                },
                 '$amount_paid',
-                0,
-              ],
-            },
+                0
+              ]
+            }
           },
         },
       },

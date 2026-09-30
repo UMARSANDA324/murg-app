@@ -1,4 +1,5 @@
-const returnsRepo = require('../repositories/returnsRepository');
+const returnsRepo = require('../repositories/returnsRepositoryMongo');
+const { publishBranchEvent } = require('../services/realtimeService');
 const { success, error, forbidden, notFound } = require('../utils/responseUtils');
 
 class ReturnsController {
@@ -31,9 +32,15 @@ class ReturnsController {
       }
 
       // Process the return
-      const result = await returnsRepo.processOrderReturn(orderID, facilityID, staffID);
+      const result = await returnsRepo.processOrderReturn(orderID, facilityID, staffID, { reason: req.body.reason || '' });
 
       if (result.success) {
+        publishBranchEvent({
+          branchIds: [facilityID],
+          type: 'branch-operation',
+          operation: 'ORDER_RETURN_PROCESSED',
+          referenceId: result.returnId,
+        });
         return success(res, result, result.message);
       } else {
         return error(res, result.message);

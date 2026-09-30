@@ -1,5 +1,5 @@
-const staffRepo = require('../repositories/staffRepository');
-const { hashPassword, md5Hash } = require('../utils/passwordUtils');
+const staffRepo = require('../repositories/staffRepositoryMongo');
+const { hashPassword } = require('../utils/passwordUtils');
 const { success, created, error, notFound } = require('../utils/responseUtils');
 
 class StaffController {
@@ -34,6 +34,9 @@ class StaffController {
       if (!name || !email || !password || !role || !facilityID) {
         return error(res, 'Name, email, password, role, and branch are required', 400);
       }
+      if (!['Admin', 'Staff'].includes(role)) {
+        return error(res, 'Role must be Admin or Staff', 400);
+      }
 
       const exists = await staffRepo.emailExists(email.trim().toLowerCase());
       if (exists) {
@@ -41,7 +44,6 @@ class StaffController {
       }
 
       const passwordHash = await hashPassword(password);
-      const legacyPassword = md5Hash(password);
       const staffId = await staffRepo.create({
         facilityID,
         name: name.trim(),
@@ -50,7 +52,6 @@ class StaffController {
         gender: gender || 'Male',
         role,
         passwordHash,
-        legacyPassword,
         address: address || '',
         fname: fname || name,
       });
@@ -66,6 +67,9 @@ class StaffController {
       const { role, facilityID } = req.body;
       if (!role || !facilityID) {
         return error(res, 'Role and branch are required', 400);
+      }
+      if (!['Admin', 'Staff'].includes(role)) {
+        return error(res, 'Role must be Admin or Staff', 400);
       }
 
       const updated = await staffRepo.updateRole(req.params.id, { role, facilityID });
@@ -101,7 +105,7 @@ class StaffController {
       if (!staff) return notFound(res, 'Staff member not found');
       
       // Do not allow admin to delete themselves
-      if (parseInt(staff.id) === parseInt(req.user.id)) {
+      if (String(staff.id) === String(req.user.id)) {
         return error(res, 'You cannot delete your own account', 400);
       }
 
@@ -142,9 +146,7 @@ class StaffController {
       }
 
       const bcryptHash = await hashPassword(password);
-      const legacyHash = md5Hash(password);
-
-      const updated = await staffRepo.updatePassword(req.params.id, bcryptHash, legacyHash);
+      const updated = await staffRepo.updatePassword(req.params.id, bcryptHash);
       if (!updated) return notFound(res, 'Staff member not found');
 
       return success(res, null, 'Staff password updated successfully');

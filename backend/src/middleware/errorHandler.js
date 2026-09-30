@@ -6,17 +6,25 @@ const { serverError } = require('../utils/responseUtils');
  */
 // eslint-disable-next-line no-unused-vars
 function errorHandler(err, req, res, next) {
-  console.error('[Error Handler]', err);
+  console.error('[API_ERROR]', {
+    requestId: req.requestId || null,
+    endpoint: `${req.method} ${req.originalUrl}`,
+    userId: req.user?.id || null,
+    branchId: req.branchId || req.user?.facilityID || null,
+    errorName: err.name,
+    errorCode: err.code || null,
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+  });
 
-  // MySQL-specific errors
-  if (err.code === 'ER_DUP_ENTRY') {
+  if (err.code === 11000 || err.code === 'ER_DUP_ENTRY') {
     return res.status(409).json({
       success: false,
       message: 'A record with this information already exists.',
     });
   }
 
-  if (err.code === 'ER_NO_REFERENCED_ROW_2') {
+  if (err.code === 'ER_NO_REFERENCED_ROW_2' || err.name === 'CastError') {
     return res.status(400).json({
       success: false,
       message: 'Referenced record does not exist.',
@@ -38,6 +46,10 @@ function errorHandler(err, req, res, next) {
       message: 'Validation failed.',
       errors: err.errors,
     });
+  }
+
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({ success: false, message: err.message });
   }
 
   return serverError(res, process.env.NODE_ENV === 'development' ? err.message : 'Internal server error');

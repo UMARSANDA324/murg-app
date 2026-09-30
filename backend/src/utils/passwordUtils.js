@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 
 /**
- * Computes MD5 hash to match legacy PHP md5($password).
+ * Computes MD5 for legacy hashes retained during data migration.
  * @param {string} password - Plain text password
  * @returns {string} MD5 hex digest
  */
@@ -20,10 +20,9 @@ function md5Hash(password) {
  *    Fallback to verify against `user.password` using MD5.
  *    This ensures that:
  *      a) Legacy users with only MD5 hashes can log in seamlessly.
- *      b) If a user changed their password via the legacy PHP interface (which updates `password`
- *         with MD5 but does not touch `password_hash`), their new password will still be accepted.
- *      c) Once MD5 matches, `needsUpgrade: true` triggers an automatic background upgrade to bcrypt
- *         in `password_hash`, re-synchronizing the two hashes.
+ *      b) Users whose migrated records only contain an MD5 hash can still authenticate.
+ *      c) Once MD5 matches, `needsUpgrade: true` triggers an automatic upgrade to bcrypt
+ *         in `password_hash`.
  * 3. If neither hash matches, return { valid: false, needsUpgrade: false, method: ... }.
  *
  * @param {string} plainPassword - Plain text password from login form

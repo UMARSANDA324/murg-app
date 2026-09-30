@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../services/api';
 import { useAuthStore } from '../store/useAuthStore';
+import { formatDate } from '../utils/dateUtils';
 import {
   Package,
   Plus,
@@ -247,7 +248,7 @@ function ApprovalReceiptPrint({ request, onClose }) {
               </div>
               <div className="grid grid-cols-2 gap-1">
                 <span className="text-slate-500 font-medium">Approved Date:</span>
-                <span className="font-semibold text-slate-700">{request.approved_at ? new Date(request.approved_at).toLocaleString('en-GB') : '—'}</span>
+                <span className="font-semibold text-slate-700">{formatDate(request.approved_at)}</span>
               </div>
             </div>
             <div className="border-t-2 border-dashed border-slate-300 pt-3 mt-3 text-center">
@@ -347,7 +348,7 @@ function CollectionReceiptPrint({ request, onClose }) {
               </div>
               <div className="grid grid-cols-2 gap-1">
                 <span className="text-slate-500 font-medium">Approval Date:</span>
-                <span className="font-semibold text-slate-700">{request.approved_at ? new Date(request.approved_at).toLocaleString('en-GB') : '—'}</span>
+                <span className="font-semibold text-slate-700">{formatDate(request.approved_at)}</span>
               </div>
             </div>
 
@@ -358,7 +359,7 @@ function CollectionReceiptPrint({ request, onClose }) {
               </div>
               <div className="grid grid-cols-2 gap-1">
                 <span className="text-slate-500 font-medium">Release Date:</span>
-                <span className="font-bold text-emerald-800">{request.released_at ? new Date(request.released_at).toLocaleString('en-GB') : '—'}</span>
+                <span className="font-bold text-emerald-800">{formatDate(request.released_at)}</span>
               </div>
             </div>
 
@@ -793,7 +794,7 @@ export default function GoodsRequestsPage() {
                       <p className="text-xs text-slate-500">
                         Requested by: <strong>{r.staff_name}</strong> from <strong>{r.requesting_branch_name || r.requesting_branch}</strong>
                       </p>
-                      <p className="text-xs text-slate-400">Approved: {r.approved_at ? new Date(r.approved_at).toLocaleString('en-GB') : '—'} by {r.approved_by_name_display || '—'}</p>
+                      <p className="text-xs text-slate-400">Approved: {formatDate(r.approved_at)} by {r.approved_by_name_display || '—'}</p>
                     </div>
                     <div className="shrink-0">
                       <button
@@ -859,7 +860,7 @@ export default function GoodsRequestsPage() {
                       </td>
                       <td className="py-3 px-4"><StatusBadge status={r.status} /></td>
                       <td className="py-3 px-4 font-mono text-slate-600 hidden lg:table-cell">{r.source_branch_name || r.source_branch || '—'}</td>
-                      <td className="py-3 px-4 font-mono text-slate-500 whitespace-nowrap hidden lg:table-cell">{new Date(r.created_at).toLocaleDateString('en-GB')}</td>
+                      <td className="py-3 px-4 font-mono text-slate-500 whitespace-nowrap hidden lg:table-cell">{formatDate(r.created_at)}</td>
                       <td className="py-3 px-4 text-center">{renderActionButton(r)}</td>
                     </tr>
                   ))
@@ -966,7 +967,7 @@ export default function GoodsRequestsPage() {
                 </div>
               </div>
               <div className="flex justify-between"><span className="text-slate-500">Requested Quantity:</span><span className="font-bold text-slate-900">{parseFloat(activeRequest.requested_quantity)} {activeRequest.unit_type}(s)</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Requested:</span><span className="text-slate-600">{new Date(activeRequest.created_at).toLocaleString('en-GB')}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Requested:</span><span className="text-slate-600">{formatDate(activeRequest.created_at)}</span></div>
               {activeRequest.reason && (
                 <div className="flex justify-between pt-1 border-t border-slate-200">
                   <span className="text-slate-500">Reason:</span>
@@ -1085,7 +1086,7 @@ export default function GoodsRequestsPage() {
                     <span className="text-slate-500">Product:</span><span className="font-bold text-slate-900">{receiptPreview.product_name}</span>
                     <span className="text-slate-500">Quantity:</span><span className="font-bold text-slate-900">{parseFloat(receiptPreview.requested_quantity)} {receiptPreview.unit_type}(s)</span>
                     <span className="text-slate-500">Approved By:</span><span className="font-semibold">{receiptPreview.approved_by_name_display || '—'}</span>
-                    <span className="text-slate-500">Approved:</span><span className="font-semibold">{receiptPreview.approved_at ? new Date(receiptPreview.approved_at).toLocaleString('en-GB') : '—'}</span>
+                    <span className="text-slate-500">Approved:</span><span className="font-semibold">{formatDate(receiptPreview.approved_at)}</span>
                   </div>
                   <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-[10px]">
                     ⚠ Releasing goods will deduct <strong>{parseFloat(receiptPreview.requested_quantity)} {receiptPreview.unit_type}(s)</strong> of <strong>{receiptPreview.product_name}</strong> from your branch inventory. This cannot be undone.

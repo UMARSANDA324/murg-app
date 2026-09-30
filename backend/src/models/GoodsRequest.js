@@ -29,6 +29,11 @@ const goodsRequestSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Stock',
   },
+  product_source: {
+    type: String,
+    enum: ['CATALOG', 'CUSTOM'],
+    default: 'CATALOG',
+  },
   product_name: {
     type: String,
     required: true,
@@ -49,6 +54,19 @@ const goodsRequestSchema = new mongoose.Schema({
   },
   admin_notes: String,
   source_branch: String,
+  source_stock_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Stock',
+  },
+  receipt_code: String,
+  collection_code: String,
+  rejection_reason: String,
+  approved_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  approved_by_name: String,
+  approved_at: Date,
+  released_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  released_by_name: String,
+  released_at: Date,
   shipment_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Shipment',
@@ -72,6 +90,9 @@ const goodsRequestSchema = new mongoose.Schema({
 });
 
 // Indexes
-goodsRequestSchema.index({ requesting_branch: 1 });
+goodsRequestSchema.index({ requesting_branch: 1, createdAt: -1 });
+goodsRequestSchema.index({ source_branch: 1, status: 1 });
+goodsRequestSchema.index({ collection_code: 1 });
+goodsRequestSchema.index({ receipt_code: 1 });
 
 module.exports = mongoose.model('GoodsRequest', goodsRequestSchema);

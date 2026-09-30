@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link, Navigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react';
 import PasswordInput from '../components/PasswordInput';
@@ -7,8 +7,13 @@ import PasswordInput from '../components/PasswordInput';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, loading, error } = useAuthStore();
+  const { login, loading, error, isAuthenticated, authReady } = useAuthStore();
   const navigate = useNavigate();
+
+  // Redirect to dashboard if already authenticated
+  if (authReady && isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
