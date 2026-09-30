@@ -154,13 +154,50 @@ settings were available to this audit, so the cause of the earlier 503 and the
 current build/start commands, deploy branch, and secret-variable presence have
 not been verified from the Render service configuration.
 
-The service IDs supplied for the existing services are `srv-daskfr17lnhs739jimo0`
-(backend) and `srv-dasina0jo6nc73bv6210` (frontend). The Render API requires
-authentication and the dashboard session was signed out, so service names and
-settings could not be queried. Do not sync the Blueprint until its service
-names are matched against those existing resources; this avoids creating
-duplicates. Production authentication, valid login, the full business API
-inventory, and a post-deployment route check remain unverified.
+## Deployment status (2026-09-30)
+
+The updated code including:
+- Backend root GET / endpoint (backend/src/app.js lines 60-77)
+- Enhanced CORS allowing localhost/127.0.0.1 at any port in development
+- render.yaml with SPA rewrite configuration
+- Updated documentation
+
+has been committed to `murg-final` (commit 14df1da) and pushed to GitHub.
+
+However, the existing Render services (`murg-frontend` and `backend-884q`) were
+created manually and are not linked to the `render.yaml` blueprint. Therefore,
+the Git push did not trigger an automatic deployment.
+
+### Required manual deployment steps
+
+To complete the production deployment:
+
+1. **Link Blueprint to existing services** (recommended approach):
+   - In Render dashboard, navigate to the Blueprint tab
+   - Link the repository's `render.yaml` to the existing services
+   - Match service names: `murg-frontend` and `backend-884q`
+   - Ensure the deploy branch is `murg-final`
+   - This will enable future auto-deploys on push
+
+2. **Alternative: Manual redeploy** (if Blueprint linking is not preferred):
+   - In Render dashboard, manually trigger a new deployment for `backend-884q`
+   - In Render dashboard, manually trigger a new deployment for `murg-frontend`
+   - Ensure environment variables are set correctly (see "Render configuration" above)
+
+3. **Verify environment variables**:
+   - Backend: `MONGODB_URI`, `JWT_SECRET`, `CORS_ORIGIN`, `EMAILJS_*` variables
+   - Frontend: `VITE_API_BASE_URL=https://backend-884q.onrender.com/api`
+
+After deployment, verify:
+- Backend GET / returns HTTP 200 with API metadata
+- Frontend routes (/login, /dashboard, /management) work on direct navigation and refresh
+- Production API communication works between frontend and backend
+
+The service IDs for the existing services are `srv-daskfr17lnhs739jimo0` (backend)
+and `srv-dasina0jo6nc73bv6210` (frontend). These IDs are for reference only;
+do not create duplicate services. Production authentication, valid login, the
+full business API inventory, and a post-deployment route check remain unverified
+until the deployment is completed.
 
 ## Troubleshooting
 
