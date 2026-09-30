@@ -33,9 +33,18 @@ app.use(cors({
   origin: (origin, callback) => {
     const isLocalDevelopmentOrigin = process.env.NODE_ENV !== 'production'
       && /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(origin || '');
-    callback(null, !origin || origin === configuredCorsOrigin || isLocalDevelopmentOrigin);
+    if (isLocalDevelopmentOrigin) {
+      callback(null, true);
+    } else if (!origin) {
+      callback(null, true);
+    } else if (origin === configuredCorsOrigin) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
   },
   credentials: true,
+  optionsSuccessStatus: 204,
 }));
 app.use((req, res, next) => {
   req.requestId = randomUUID();

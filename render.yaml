@@ -12,7 +12,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: CORS_ORIGIN
-        value: https://murg-frontend.onrender.com
+        value: https://murg-ng.com
       - key: MONGODB_URI
         sync: false
       - key: JWT_SECRET
