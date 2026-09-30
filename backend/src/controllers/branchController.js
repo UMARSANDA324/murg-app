@@ -1,4 +1,4 @@
-const branchRepo = require('../repositories/branchRepository');
+const branchRepo = require('../repositories/branchRepositoryMongo');
 const { success, created, error, notFound } = require('../utils/responseUtils');
 
 class BranchController {

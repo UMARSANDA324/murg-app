@@ -2,6 +2,20 @@
 
 Base path is `/api`. Unless marked public, routes require `Authorization: Bearer <JWT>`. Responses use the standard envelope described in [ARCHITECTURE_CURRENT.md](ARCHITECTURE_CURRENT.md).
 
+## Root Endpoint
+
+| Method | Route | Purpose |
+|---|---|---|
+| GET | `/` | API information and health status |
+
+The root endpoint returns API metadata, version, environment, and database connection status without exposing secrets.
+
+## Health Check
+
+| Method | Route | Purpose |
+|---|---|---|
+| GET | `/api/health` | Service health and timestamp |
+
 ## Public
 
 | Method | Route | Purpose |
@@ -27,6 +41,9 @@ Base path is `/api`. Unless marked public, routes require `Authorization: Bearer
 | GET | `/api/branches/dashboard` | Authenticated branch scope. |
 | GET | `/api/branches/:branchId/dashboard` | Authenticated branch scope. |
 | GET | `/api/branches/:prefix/:suffix/dashboard` | Compatibility form for slash branch codes. |
+| GET | `/api/branches/:prefix/:suffix` | Branch lookup for IDs such as `MURG/007`. |
+| PUT | `/api/branches/:prefix/:suffix` | Admin update for slash-form branch IDs. |
+| PATCH | `/api/branches/:prefix/:suffix/status` | Admin status update for slash-form branch IDs. |
 | GET | `/api/branches/:branchId` | Authenticated branch scope. |
 | PUT | `/api/branches/:branchId` | Admin; update branch. |
 | PATCH | `/api/branches/:branchId/status` | Admin; activate/deactivate. |
@@ -37,12 +54,14 @@ Base path is `/api`. Unless marked public, routes require `Authorization: Bearer
 
 ## Stocks and Movements
 
-- `GET /api/stocks`: branch/store/search inventory.
-- `GET /api/stocks/catalog`: authenticated global catalog name search used for custom goods requests.
+- `GET /api/stocks`: branch/store/search inventory with case-insensitive partial matching.
+- `GET /api/stocks/catalog`: authenticated global catalog name search used for custom goods requests with case-insensitive partial matching.
 - `GET /api/stocks/stores`: active stores for resolved branch.
 - `GET /api/stocks/movements`: branch-scoped ledger; supports `stockId`, `startDate`, `endDate`, `limit`, `offset`.
 - `GET /api/stocks/:id`: one stock record.
 - `POST /api/stocks/receive`: receive supplier stock and create movement.
+- `POST /api/stocks/stores`, `PUT /api/stocks/stores/:id`, `DELETE /api/stocks/stores/:id`: Admin-only store management.
+- `GET /api/stocks/purchases/history`, `GET /api/stocks/purchases/totals`: branch-scoped supplier purchase history and totals.
 - `PATCH /api/stocks/:id/price`: Admin-only price update.
 - `PATCH /api/stocks/:id/yard-config`: Admin-only per-yard configuration.
 
@@ -56,7 +75,7 @@ Base path is `/api`. Unless marked public, routes require `Authorization: Bearer
 
 ## Customers and Debts
 
-- `GET /api/customers`: branch-scoped customers/debt data.
+- `GET /api/customers`: branch-scoped customers/debt data with case-insensitive name/phone search.
 - `POST /api/customers`: create customer.
 - `GET /api/customers/:id`: retrieve authorized customer.
 - `POST /api/customers/:id/deposits`: record authorized debt deposit.
@@ -65,9 +84,14 @@ Base path is `/api`. Unless marked public, routes require `Authorization: Bearer
 ## Shipments
 
 - `GET /api/shipments`: authorized branch shipments.
-- `POST /api/shipments`: create/dispatch transfer.
-- `GET /api/shipments/:id`: authorized details.
-- `POST /api/shipments/:id/receive`: receive destination shipment.
+- `POST /api/shipments`: create/dispatch transfer with atomic stock deduction and rollback on failure.
+- `GET /api/shipments/:id`: authorized details with populated branch names and user info.
+- `POST /api/shipments/:id/receive`: receive destination shipment with atomic stock addition and rollback on failure.
+
+## Expenses and Returns
+
+- Expenses: `GET /api/expenses`, `/totals`, `/dashboard`, `GET /:id`, `POST /`, `PUT /:id`, and `DELETE /:id`; all reads and mutations are scoped to the resolved branch.
+- Returns: `GET /api/returns/validate/:orderID` validates order eligibility for return; `POST /api/returns/process` processes return with stock restoration and debt reversal. Returns preserve original order rows and create a separate return ledger record.
 
 ## Goods Requests and Receipts
 
@@ -84,9 +108,18 @@ Base path is `/api`. Unless marked public, routes require `Authorization: Bearer
 ## Management, Notifications, Analytics, Realtime
 
 - Admin management: `GET /api/management/overview`, `GET /api/management/audit-logs` with `limit`, `offset`, `action`, `facilityID` filters.
-- Authenticated bridge: `POST /api/management/bridge-ticket` with an allowlisted internal legacy target.
-- Notifications: `GET /api/notifications`, `GET /api/notifications/unread-count`, `PATCH /api/notifications/:id/read`, `POST /api/notifications/mark-all-read`, `POST /api/notifications/mark-read`.
+- Notifications: `GET /api/notifications` returns notifications scoped to user ID, role, or branch using OR logic; `GET /api/notifications/unread-count` returns unread count using the same OR logic; `PATCH /api/notifications/:id/read` marks single notification as read; `POST /api/notifications/mark-all-read` marks all as read; `POST /api/notifications/mark-read` batch-marks visible notifications as read. All notification operations enforce ownership and use the same recipient/authorization rules.
 - Analytics: `GET /api/analytics/sales-activity` with optional `branchId` and `date`.
 - Realtime: `GET /api/realtime/branch`, authenticated and branch-scoped stream.
+
+## Shipment Transaction Strategy
+
+Shipment transfers use atomic operations with safe rollback:
+
+- **No MongoDB transactions**: The current Atlas deployment topology does not support multi-document transactions required for the complex shipment transfer operations.
+- **Atomic single-document operations**: Stock deductions and additions use atomic `$inc` operations with optimistic concurrency checks.
+- **Manual rollback**: If any step fails, the system reverses stock changes and removes created records to prevent partial stock movement.
+- **Consistency guarantee**: The system cannot end up with source stock deducted but destination stock not received (or vice versa).
+- **Audit trail**: All stock movements are recorded in the `stock_movements` ledger for traceability.
 
 For request bodies and business rules, read the owning feature document and controller/repository together. Do not infer authorization from the frontend route.

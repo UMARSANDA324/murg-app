@@ -53,6 +53,10 @@ const stockSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  new_order: Number,
+  opening_quantity: Number,
+  Ssubtotal: Number,
+  Bsubtotal: Number,
   createdAt: {
     type: Date,
     default: Date.now,

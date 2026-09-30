@@ -17,6 +17,19 @@ import {
   Printer,
 } from 'lucide-react';
 
+function useDebounce(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+  return debouncedValue;
+}
+
 export default function StockPage() {
   const { activeBranch } = useBranchStore();
   const { user } = useAuthStore();
@@ -25,6 +38,7 @@ export default function StockPage() {
   const [movements, setMovements] = useState([]);
   const [stores, setStores] = useState([]);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 400);
   const [selectedStore, setSelectedStore] = useState('');
   const [loading, setLoading] = useState(false);
   const [expandedDates, setExpandedDates] = useState(new Set());
@@ -65,7 +79,7 @@ export default function StockPage() {
         fetchMovements({ reset: true });
       }
     }
-  }, [activeBranch, selectedStore, activeTab]);
+  }, [activeBranch, selectedStore, activeTab, debouncedSearch]);
 
   const fetchStores = async () => {
     try {
@@ -81,7 +95,7 @@ export default function StockPage() {
     try {
       let url = `/stocks?branchId=${activeBranch}`;
       if (selectedStore) url += `&storeId=${selectedStore}`;
-      if (search) url += `&search=${encodeURIComponent(search)}`;
+      if (debouncedSearch) url += `&search=${encodeURIComponent(debouncedSearch)}`;
       const res = await api.get(url);
       setStocks(res.data.data || []);
     } catch (err) {
@@ -240,8 +254,8 @@ export default function StockPage() {
     setReceiveSaving(true);
     try {
       await api.post(`/stocks/receive?branchId=${activeBranch}`, {
-        stockId: parseInt(receiveProduct),
-        storeId: receiveStore ? parseInt(receiveStore) : null,
+        stockId: receiveProduct,
+        storeId: receiveStore || null,
         quantity: parseFloat(receiveQty),
         costPrice: parseFloat(receiveCost),
         purchaseFrom: receiveSupplier,
@@ -324,7 +338,6 @@ export default function StockPage() {
                 placeholder="Search product catalog..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && fetchStocks()}
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg py-2 pl-9 pr-3 text-sm focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -743,7 +756,7 @@ export default function StockPage() {
 
               {receiveUnit === 'belt' && receiveProduct && (
                 (() => {
-                  const selObj = stocks.find(s => s.id === parseInt(receiveProduct));
+                  const selObj = stocks.find(s => String(s.id) === String(receiveProduct));
                   const ypb = selObj?.yards_per_belt || 100;
                   return (
                     <div className="p-2.5 bg-indigo-50 border border-indigo-200 rounded-lg text-indigo-900">

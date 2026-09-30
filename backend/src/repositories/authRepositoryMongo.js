@@ -1,5 +1,11 @@
-const { User, PasswordReset, AuditLog } = require('../models');
+const { User, PasswordReset } = require('../models');
 const { mongoose } = require('../config/mongodb');
+const { reserveLegacyIds } = require('../services/legacyIdService');
+const { recordAuditLog } = require('../services/auditLogService');
+
+function resetDTO(reset) {
+  return reset ? { ...reset, id: reset._id.toString() } : null;
+}
 
 /**
  * Typed error for auth repository failures — allows the controller to log
@@ -44,7 +50,7 @@ class AuthRepositoryMongo {
    * Get safe user profile by ID (no passwords).
    */
   async findById(userId) {
-    const user = await User.findOne({ mysqlId: userId })
+    const user = await User.findById(userId)
       .select('-password -password_hash')
       .lean();
     return user || null;
@@ -57,12 +63,12 @@ class AuthRepositoryMongo {
     const sixtySecondsAgo = new Date(Date.now() - 60 * 1000);
     const reset = await PasswordReset.findOne({
       email: email.toLowerCase(),
-      created_at: { $gte: sixtySecondsAgo },
+      createdAt: { $gte: sixtySecondsAgo },
       is_used: false,
     })
       .sort({ _id: -1 })
       .lean();
-    return reset || null;
+    return resetDTO(reset);
   }
 
   /**
@@ -70,30 +76,32 @@ class AuthRepositoryMongo {
    * Invalidates any previous unverified OTP requests for the same email.
    */
   async createPasswordReset({ userId, email, otpHash, expiresMinutes = 10 }) {
-    // Invalidate previous unverified OTP requests
-    await PasswordReset.updateMany(
-      {
-        email: email.toLowerCase(),
-        is_verified: false,
-        is_used: false,
-      },
-      { is_used: true }
-    );
-
-    const expiresAt = new Date(Date.now() + expiresMinutes * 60 * 1000);
-    const reset = await PasswordReset.create({
-      user_id: userId,
-      email: email.toLowerCase(),
-      otp_hash: otpHash,
-      attempts: 0,
-      max_attempts: 5,
-      is_verified: false,
-      is_used: false,
-      expires_at: expiresAt,
-      mysqlId: Date.now(), // Use timestamp as mysqlId for migration compatibility
-    });
-
-    return reset._id;
+    const session = await mongoose.startSession();
+    let resetId;
+    try {
+      await session.withTransaction(async () => {
+        await PasswordReset.updateMany(
+          { email: email.toLowerCase(), is_verified: false, is_used: false },
+          { is_used: true },
+          { session }
+        );
+        const [mysqlId] = await reserveLegacyIds(PasswordReset, 'passwordResetId', 1, session);
+        const expiresAt = new Date(Date.now() + expiresMinutes * 60 * 1000);
+        const [reset] = await PasswordReset.create([{
+          user_id: userId,
+          email: email.toLowerCase(),
+          otp_hash: otpHash,
+          attempts: 0,
+          max_attempts: 5,
+          is_verified: false,
+          is_used: false,
+          expires_at: expiresAt,
+          mysqlId,
+        }], { session });
+        resetId = reset._id;
+      });
+      return resetId;
+    } finally { await session.endSession(); }
   }
 
   /**
@@ -108,7 +116,7 @@ class AuthRepositoryMongo {
     })
       .sort({ _id: -1 })
       .lean();
-    return reset || null;
+    return resetDTO(reset);
   }
 
   /**
@@ -145,27 +153,27 @@ class AuthRepositoryMongo {
       is_used: false,
       expires_at: { $gt: new Date() },
     }).lean();
-    return reset || null;
+    return resetDTO(reset);
   }
 
   /**
    * Complete password reset atomically.
    */
-  async resetUserPassword({ userId, resetId, bcryptHash, legacyMd5Hash, ipAddress = '' }) {
+  async resetUserPassword({ userId, resetId, bcryptHash, ipAddress = '' }) {
     const session = await mongoose.startSession();
     try {
       session.startTransaction();
 
       // Get user for audit log
-      const user = await User.findOne({ mysqlId: userId }).session(session);
+      const user = await User.findById(userId).session(session);
       if (!user) {
         throw new Error('User not found');
       }
 
       // Update facility credentials
       await User.updateOne(
-        { mysqlId: userId },
-        { password_hash: bcryptHash, password: legacyMd5Hash },
+        { _id: userId },
+        { $set: { password_hash: bcryptHash, updatedAt: new Date() }, $unset: { password: 1 } },
         { session }
       );
 
@@ -173,21 +181,15 @@ class AuthRepositoryMongo {
       await PasswordReset.findByIdAndUpdate(resetId, { is_used: true }, { session });
 
       // Audit log entry
-      await AuditLog.create(
-        [
-          {
-            action: 'PASSWORD_RESET_SUCCESS',
-            user_id: user._id,
-            user_name: user.name,
-            facilityID: user.facilityID,
-            entity_type: 'facility',
-            entity_id: String(userId),
-            ip_address: ipAddress,
-            mysqlId: Date.now(),
-          },
-        ],
-        { session }
-      );
+      await recordAuditLog({
+        action: 'PASSWORD_RESET_SUCCESS',
+        user_id: user._id,
+        user_name: user.name,
+        facilityID: user.facilityID,
+        entity_type: 'facility',
+        entity_id: String(userId),
+        ip_address: ipAddress,
+      }, session);
 
       await session.commitTransaction();
       return true;

@@ -1,6 +1,6 @@
 const shipmentReceiptRepo = require('../repositories/shipmentReceiptRepository');
 const { publishBranchEvent } = require('../services/realtimeService');
-const { success, error } = require('../utils/responseUtils');
+const { success, error, forbidden } = require('../utils/responseUtils');
 
 class ShipmentReceiptController {
   /**
@@ -16,6 +16,14 @@ class ShipmentReceiptController {
       const receipt = await shipmentReceiptRepo.findByReceiptCode(code.trim());
       if (!receipt) {
         return error(res, 'Receipt reference code not found. Please verify the code and try again.', 404);
+      }
+
+      if (
+        !req.user.isGlobalAdmin &&
+        receipt.source_branch !== req.user.facilityID &&
+        receipt.destination_branch !== req.user.facilityID
+      ) {
+        return forbidden(res, 'You are not authorized to view this shipment receipt.');
       }
 
       return success(res, receipt);

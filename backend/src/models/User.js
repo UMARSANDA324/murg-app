@@ -13,6 +13,8 @@ const userSchema = new mongoose.Schema({
   },
   name: String,
   fname: String,
+  gender: String,
+  address: String,
   email: {
     type: String,
     required: true,
@@ -34,7 +36,7 @@ const userSchema = new mongoose.Schema({
   password_hash: String, // bcrypt
   permissions: {
     type: [String],
-    default: ['*'], // Admin default
+    default: [],
   },
   createdAt: {
     type: Date,

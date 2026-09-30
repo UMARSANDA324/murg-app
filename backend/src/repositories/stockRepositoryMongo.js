@@ -1,5 +1,6 @@
 const { Stock, Store, Branch, Purchase, StockMovement, User, Order } = require('../models');
 const { mongoose } = require('../config/mongodb');
+const { reserveLegacyIds } = require('../services/legacyIdService');
 
 /**
  * StockRepositoryMongo — MongoDB-based inventory management.
@@ -13,8 +14,9 @@ class StockRepositoryMongo {
     const query = { facilityID };
     if (status) query.status = status;
     if (storeId) query.store_id = storeId;
-    if (search) {
-      query.$or = [{ name: { $regex: search, $options: 'i' } }];
+    if (search && search.trim()) {
+      const escapedSearch = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query.$or = [{ name: { $regex: escapedSearch, $options: 'i' } }];
     }
 
     const stocks = await Stock.find(query)
@@ -24,6 +26,8 @@ class StockRepositoryMongo {
 
     return stocks.map(s => ({
       ...s,
+      id: s._id.toString(),
+      store_id: s.store_id?._id?.toString() || s.store_id?.toString() || null,
       quantity: parseFloat(s.quantity) || 0,
       buying: parseFloat(s.buying) || 0,
       selling: parseFloat(s.selling) || 0,
@@ -38,6 +42,7 @@ class StockRepositoryMongo {
    * Get a single stock item, scoped to branch.
    */
   async findById(id, facilityID) {
+    if (!mongoose.Types.ObjectId.isValid(id)) return null;
     const stock = await Stock.findOne({ _id: id, facilityID })
       .populate('store_id', 'store_name status')
       .lean();
@@ -46,6 +51,8 @@ class StockRepositoryMongo {
     
     return {
       ...stock,
+      id: stock._id.toString(),
+      store_id: stock.store_id?._id?.toString() || stock.store_id?.toString() || null,
       quantity: parseFloat(stock.quantity) || 0,
       buying: parseFloat(stock.buying) || 0,
       selling: parseFloat(stock.selling) || 0,
@@ -59,9 +66,8 @@ class StockRepositoryMongo {
    * Get a stock item locked for update (inside a transaction).
    */
   async findByIdForUpdate(session, id, facilityID) {
-    const stock = await Stock.findOne({ _id: id, facilityID })
-      .session(session)
-      .lean();
+    if (!mongoose.Types.ObjectId.isValid(id)) return null;
+    const stock = await Stock.findOne({ _id: id, facilityID }).session(session).lean();
     return stock || null;
   }
 
@@ -95,12 +101,18 @@ class StockRepositoryMongo {
   /**
    * Update selling, buying, price_per_yard, and yards_per_belt (Admin only).
    */
-  async updatePrice(id, { selling, buying, price_per_yard = null, yards_per_belt = null }, facilityID) {
+  async updatePrice(id, { selling, buying, price_per_yard = null, yards_per_belt = null }, facilityID, session = null) {
+    if (!mongoose.Types.ObjectId.isValid(id)) return false;
+    let stockQuery = Stock.findOne({ _id: id, facilityID });
+    if (session) stockQuery = stockQuery.session(session);
+    const stock = await stockQuery.lean();
+    if (!stock) return false;
+
     const updateData = {
       selling,
       buying,
-      Ssubtotal: selling * (await Stock.findById(id)).quantity,
-      Bsubtotal: buying * (await Stock.findById(id)).quantity,
+      Ssubtotal: selling * stock.quantity,
+      Bsubtotal: buying * stock.quantity,
     };
     if (price_per_yard !== undefined && price_per_yard !== null) {
       updateData.price_per_yard = price_per_yard;
@@ -109,19 +121,21 @@ class StockRepositoryMongo {
       updateData.yards_per_belt = yards_per_belt;
     }
 
-    const result = await Stock.updateOne({ _id: id, facilityID }, updateData);
-    return result.modifiedCount > 0;
+    const result = await Stock.updateOne({ _id: id, facilityID }, updateData, session ? { session } : {});
+    return result.matchedCount > 0;
   }
 
   /**
    * Dedicated yard configuration update (Admin only).
    */
-  async updateYardConfig(id, { price_per_yard, yards_per_belt }, facilityID) {
+  async updateYardConfig(id, { price_per_yard, yards_per_belt }, facilityID, session = null) {
+    if (!mongoose.Types.ObjectId.isValid(id)) return false;
     const result = await Stock.updateOne(
       { _id: id, facilityID },
-      { price_per_yard, yards_per_belt }
+      { price_per_yard, yards_per_belt },
+      session ? { session } : {}
     );
-    return result.modifiedCount > 0;
+    return result.matchedCount > 0;
   }
 
   /**
@@ -132,12 +146,15 @@ class StockRepositoryMongo {
     facilityID, storeId, stockId, quantity, costPrice, purchaseFrom, forDesc, amountPaid, performedBy, unitType
   }) {
     // Get current quantity, unit type, and branch sales mode
-    const stock = await Stock.findOne({ _id: stockId, facilityID })
-      .populate('facilityID')
-      .session(session)
-      .lean();
+    if (!mongoose.Types.ObjectId.isValid(stockId)) throw new Error('Stock item not found');
+    const stock = await Stock.findOne({ _id: stockId, facilityID }).session(session).lean();
     
     if (!stock) throw new Error('Stock item not found');
+    if (storeId) {
+      if (!mongoose.Types.ObjectId.isValid(storeId) || !await Store.exists({ _id: storeId, branch_id: facilityID }).session(session)) {
+        throw new Error('Store not found for this branch');
+      }
+    }
 
     const branch = await Branch.findOne({ facilityID }).session(session).lean();
     const isPerYard = branch?.sales_mode === 'PER_YARD';
@@ -159,18 +176,23 @@ class StockRepositoryMongo {
 
     // Increment stock
     const nextUnitType = isPerYard ? 'yard' : (stock.unit_type || 'belt');
-    await Stock.findByIdAndUpdate(
-      stockId,
+    const stockUpdate = await Stock.updateOne(
+      { _id: stockId, facilityID },
       {
-        quantity: newQty,
-        new_order: stock.new_order + receivedQuantity,
-        unit_type: nextUnitType,
-        Bsubtotal: stock.buying * newQty,
+        $set: {
+          quantity: newQty,
+          unit_type: nextUnitType,
+          Bsubtotal: stock.buying * newQty,
+        },
+        $inc: { new_order: receivedQuantity },
       },
       { session }
     );
+    if (!stockUpdate.matchedCount) throw new Error('Stock item not found');
 
     // Record in purchase_history
+    const [purchaseMysqlId] = await reserveLegacyIds(Purchase, 'purchaseId', 1, session);
+    const [movementMysqlId] = await reserveLegacyIds(StockMovement, 'stockMovementId', 1, session);
     const purchase = await Purchase.create(
       [{
         facilityID,
@@ -185,7 +207,7 @@ class StockRepositoryMongo {
         for_desc: (forDesc || '') + conversionNote,
         purchase_date: new Date(),
         purchase_from: purchaseFrom,
-        mysqlId: Date.now(),
+        mysqlId: purchaseMysqlId,
       }],
       { session }
     );
@@ -204,7 +226,7 @@ class StockRepositoryMongo {
         reference_id: String(purchase[0]._id),
         notes: `From: ${purchaseFrom}${conversionNote}`,
         performed_by: performedBy,
-        mysqlId: Date.now(),
+        mysqlId: movementMysqlId,
       }],
       { session }
     );
@@ -223,14 +245,17 @@ class StockRepositoryMongo {
    */
   async getMovements({ facilityID, stockId = null, startDate = null, endDate = null, limit = 500, offset = 0 } = {}) {
     const matchQuery = { facilityID };
-    if (stockId) matchQuery.stock_id = stockId;
-    if (startDate) matchQuery.created_at = { ...matchQuery.created_at, $gte: new Date(startDate) };
-    if (endDate) matchQuery.created_at = { ...matchQuery.created_at, $lte: new Date(endDate) };
+    if (stockId) {
+      if (!mongoose.Types.ObjectId.isValid(stockId)) return [];
+      matchQuery.stock_id = stockId;
+    }
+    if (startDate) matchQuery.createdAt = { ...matchQuery.createdAt, $gte: new Date(startDate) };
+    if (endDate) matchQuery.createdAt = { ...matchQuery.createdAt, $lte: new Date(endDate) };
 
     const movements = await StockMovement.find(matchQuery)
       .populate('stock_id', 'name')
       .populate('performed_by', 'name')
-      .sort({ created_at: -1 })
+      .sort({ createdAt: -1 })
       .limit(Math.min(Math.max(parseInt(limit) || 500, 1), 500))
       .skip(Math.max(parseInt(offset) || 0, 0))
       .lean();
@@ -240,7 +265,7 @@ class StockRepositoryMongo {
       movements.map(async (sm) => {
         let orderData = {};
         if (sm.reference_type === 'orders') {
-          const order = await Order.findOne({ orderID: sm.reference_id }).lean();
+          const order = await Order.findOne({ orderID: sm.reference_id, facilityID }).lean();
           if (order) {
             orderData = {
               order_payment: order.payment,
@@ -249,15 +274,17 @@ class StockRepositoryMongo {
               order_buyer_name: order.buyer_name,
               order_net_total: order.net_total,
               order_amount_paid: order.amount_paid,
-              is_credit: order.payment === 'credit' || order.status === 0 ? 1 : 0,
+              is_credit: String(order.payment).toLowerCase() === 'credit' || Number(order.status) === 0 ? 1 : 0,
             };
           }
         }
 
         return {
           ...sm,
-          business_date: sm.createdAt.toISOString().split('T')[0],
-          business_time: sm.createdAt.toTimeString().split(' ')[0].substring(0, 5),
+          business_date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos' }).format(sm.createdAt),
+          business_time: new Intl.DateTimeFormat('en-GB', {
+            timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+          }).format(sm.createdAt),
           product_name: sm.stock_id?.name || null,
           performed_by_name: sm.performed_by?.name || null,
           ...orderData,
@@ -265,48 +292,68 @@ class StockRepositoryMongo {
       })
     );
 
-    return enriched;
+    return enriched.map((movement) => ({
+      ...movement,
+      id: movement._id.toString(),
+      created_at: movement.createdAt,
+      stock_id: movement.stock_id?._id?.toString() || movement.stock_id?.toString() || null,
+      performed_by: movement.performed_by?._id?.toString() || movement.performed_by?.toString() || null,
+    }));
   }
 
   /**
    * Get all stores for a branch.
    */
   async getStores(facilityID) {
-    return await Store.find({ branch_id: facilityID, status: 'active' })
+    const stores = await Store.find({ branch_id: facilityID, status: 'active' })
       .sort({ store_name: 1 })
       .lean();
+    return stores.map((store) => ({ ...store, id: store._id.toString() }));
   }
 
   /**
    * Get store by ID
    */
   async getStoreById(id, facilityID) {
-    return await Store.findOne({ _id: id, branch_id: facilityID }).lean();
+    if (!mongoose.Types.ObjectId.isValid(id)) return null;
+    const store = await Store.findOne({ _id: id, branch_id: facilityID }).lean();
+    return store ? { ...store, id: store._id.toString() } : null;
   }
 
   /**
    * Create new store
    */
   async createStore({ facilityID, storeName, branchId, status = 'active' }) {
-    // Check for duplicate store name in same branch
-    const existing = await Store.findOne({ store_name: storeName, branch_id: branchId });
-    if (existing) {
-      throw new Error('A store with this name already exists for this branch');
-    }
-
-    const store = await Store.create({
-      store_name: storeName,
-      branch_id: branchId,
-      status,
-      mysqlId: Date.now(),
-    });
-    return store._id;
+    const session = await mongoose.startSession();
+    let storeId;
+    try {
+      await session.withTransaction(async () => {
+        if (!await Branch.exists({ facilityID: branchId }).session(session)) throw new Error('Branch not found');
+        const existing = await Store.findOne({ store_name: storeName, branch_id: branchId }).session(session);
+        if (existing) throw new Error('A store with this name already exists for this branch');
+        const [mysqlId] = await reserveLegacyIds(Store, 'storeId', 1, session);
+        const [store] = await Store.create([{
+          store_name: storeName,
+          branch_id: branchId,
+          status,
+          mysqlId,
+        }], { session });
+        storeId = store._id;
+      });
+      return storeId;
+    } finally { await session.endSession(); }
   }
 
   /**
    * Update store
    */
   async updateStore(id, { facilityID, storeName, branchId, status }) {
+    if (!mongoose.Types.ObjectId.isValid(id)) return false;
+    const storeQuery = { _id: id };
+    if (facilityID) storeQuery.branch_id = facilityID;
+    const store = await Store.findOne(storeQuery);
+    if (!store) return false;
+    if (!await Branch.exists({ facilityID: branchId })) throw new Error('Branch not found');
     // Check for duplicate store name (excluding current store)
     const existing = await Store.findOne({
       store_name: storeName,
@@ -318,21 +365,22 @@ class StockRepositoryMongo {
     }
 
     const result = await Store.updateOne(
-      { _id: id },
-      { store_name: storeName, branch_id: branchId, status }
+      storeQuery,
+      { store_name: storeName, branch_id: branchId, status: status || store.status, updatedAt: new Date() }
     );
-    return result.modifiedCount > 0;
+    return result.matchedCount > 0;
   }
 
   /**
    * Delete store (soft delete by setting status to inactive)
    */
   async deleteStore(id, facilityID) {
+    if (!mongoose.Types.ObjectId.isValid(id)) return false;
     const result = await Store.updateOne(
       { _id: id, branch_id: facilityID },
       { status: 'inactive' }
     );
-    return result.modifiedCount > 0;
+    return result.matchedCount > 0;
   }
 
   /**
@@ -361,6 +409,8 @@ class StockRepositoryMongo {
 
     return purchases.map(p => ({
       ...p,
+      id: p._id.toString(),
+      stock_id: p.stock_id?._id?.toString() || p.stock_id?.toString() || null,
       stock_name: p.stock_id?.name || null,
     }));
   }
@@ -420,7 +470,8 @@ class StockRepositoryMongo {
   async globalCatalogSearch({ search = null, limit = 50 } = {}) {
     const matchQuery = { status: 'active' };
     if (search && search.trim()) {
-      matchQuery.name = { $regex: search.trim(), $options: 'i' };
+      const escapedSearch = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      matchQuery.name = { $regex: escapedSearch, $options: 'i' };
     }
 
     const stocks = await Stock.aggregate([
@@ -438,7 +489,7 @@ class StockRepositoryMongo {
     ]);
 
     return stocks.map(s => ({
-      id: s.representative_id,
+      id: s.representative_id.toString(),
       name: s.name,
       unit_type: s.unit_type,
     }));

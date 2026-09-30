@@ -2,16 +2,21 @@
 
 ## Automated Commands
 
-- Backend integration/regression: `npm test --prefix backend`.
+- Backend database-free checks: `npm test --prefix backend`.
+- MongoDB integration target check: `npm run test:integration --prefix backend` (requires `MONGODB_TEST_URI`).
 - Frontend build: `npm run build --prefix frontend`.
 - Frontend lint: `npm run lint --prefix frontend`.
 - Backend syntax checks can use `node --check` on touched CommonJS files.
 
-## Existing Coverage
+## Database Safety
 
-`backend/tests/api.test.js` is an integration suite that starts the API, creates isolated test identities/data, exercises health/auth/password reset, management authorization, branch/sales modes, stock receiving, pricing authorization, checkout/credit, shipment conversion, goods requests, receipt verification/release, wrong-branch rejection, and replay prevention. `backend/tests/management.test.js` covers management behavior separately.
+All write integration tests must use `MONGODB_TEST_URI`, and the harness refuses to proceed unless the URI resolves exactly to the `murg_test` database. The test-only cleanup helper checks the active Mongoose connection and every model's connection before deleting test collections. Never point it at `murg`.
 
-The suite uses the configured database and must be treated as a database-mutating integration test even when it cleans up test data. Never point it at production data without an approved isolation plan.
+The legacy `backend/tests/api.test.js` mutates MySQL and has broad cleanup/reset behavior. It is no longer the `npm test` target and must not be run. No MongoDB write integration run is safe until a dedicated `MONGODB_TEST_URI` is configured.
+
+## Current Coverage
+
+The default suite covers URI safety/rejection, Lagos DAS/WAS/MAS date boundaries, branch-scoped aggregation shape, and controller/repository method presence without connecting to MongoDB. API workflows and transactional rollback require the isolated Atlas test database and valid test identities.
 
 ## Areas Not Fully Automated
 

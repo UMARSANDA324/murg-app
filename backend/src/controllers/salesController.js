@@ -1,4 +1,4 @@
-const salesRepo = require('../repositories/salesRepository');
+const salesRepo = require('../repositories/salesRepositoryMongo');
 const { publishBranchEvent } = require('../services/realtimeService');
 const { success, created, error, notFound, forbidden } = require('../utils/responseUtils');
 
@@ -84,14 +84,14 @@ class SalesController {
         staffID: req.user.id,
         staffName: req.user.name,
         items: items.map(i => ({
-          stockId: parseInt(i.stockId),
+          stockId: String(i.stockId),
           quantity: parseFloat(i.quantity),
           price: parseFloat(i.price),
           itemDiscount: parseFloat(i.itemDiscount) || 0,
         })),
         buyerName: buyerName ? buyerName.trim() : null,
         customerName: customerName ? customerName.trim() : null,
-        customerID: customerId ? parseInt(customerId) : null,
+        customerID: customerId ? String(customerId) : null,
         globalDiscount: parseFloat(globalDiscount) || 0,
         payment: {
           cash: parseFloat(payment.cash) || 0,

@@ -1,4 +1,4 @@
-const goodsRequestRepo = require('../repositories/goodsRequestRepository');
+const goodsRequestRepo = require('../repositories/goodsRequestRepositoryMongo');
 const { publishBranchEvent } = require('../services/realtimeService');
 const { success, error, forbidden } = require('../utils/responseUtils');
 
@@ -13,7 +13,7 @@ class GoodsRequestController {
       const { stockId, productName, requestedQuantity, unitType, reason, productSource } = req.body;
 
       // Determine mode
-      const parsedStockId = stockId ? parseInt(stockId) : null;
+      const parsedStockId = stockId ? String(stockId) : null;
       const isCustom = !parsedStockId || productSource === 'CUSTOM';
       const resolvedSource = isCustom ? 'CUSTOM' : 'CATALOG';
 
@@ -34,7 +34,9 @@ class GoodsRequestController {
         ? productName.trim().substring(0, 200)
         : productName
         ? productName.trim()
-        : `Product #${parsedStockId}`;
+        : productName
+        ? productName.trim()
+        : `Product ${parsedStockId}`;
 
       // Staff identity from JWT — never trusted from body
       const result = await goodsRequestRepo.createRequest({
@@ -246,7 +248,7 @@ class GoodsRequestController {
         adminId: user.id,
         adminName: user.name,
         sourceBranch,
-        sourceStockId: parseInt(sourceStockId),
+        sourceStockId: String(sourceStockId),
         adminNotes: adminNotes ? adminNotes.trim() : '',
       });
 
@@ -292,7 +294,7 @@ class GoodsRequestController {
       });
 
       publishBranchEvent({
-        branchIds: [user.facilityID],
+        branchIds: [user.facilityID, result.requestingBranch],
         type: 'branch-operation',
         operation: 'GOODS_RELEASED',
         referenceId: result.requestId || result.collectionCode,
@@ -326,8 +328,15 @@ class GoodsRequestController {
         adminId: user.id,
         adminName: user.name,
         sourceBranch,
-        sourceStockId: parseInt(sourceStockId),
+        sourceStockId: String(sourceStockId),
         adminNotes: adminNotes ? adminNotes.trim() : '',
+      });
+
+      publishBranchEvent({
+        branchIds: [sourceBranch, result.requestingBranch],
+        type: 'branch-operation',
+        operation: 'GOODS_REQUEST_DISPATCHED',
+        referenceId: result.requestId,
       });
 
       return success(res, result, 'Goods request approved and shipment dispatched.');

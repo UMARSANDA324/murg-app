@@ -1,4 +1,4 @@
-const managementRepo = require('../repositories/managementRepository');
+const managementRepo = require('../repositories/managementRepositoryMongo');
 const { success, error, forbidden } = require('../utils/responseUtils');
 
 class ManagementController {

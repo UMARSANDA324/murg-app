@@ -10,6 +10,10 @@ const shipmentSchema = new mongoose.Schema({
   tracking_number: String,
   source_branch: String,
   destination_branch: String,
+  request_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'GoodsRequest',
+  },
   source_store_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Store',
@@ -39,6 +43,7 @@ const shipmentSchema = new mongoose.Schema({
   received_at: {
     type: Date,
   },
+  receiving_receipt_code: String,
   notes: String,
   created_by: {
     type: mongoose.Schema.Types.ObjectId,

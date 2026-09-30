@@ -25,3 +25,7 @@ A sale is not a stock transfer, supplier purchase, goods request, or unrelated s
 - Historical quantity changes: `stock_movements`.
 - Customer outstanding balance: `outstand` plus the existing deposit workflow.
 - Historical product price/name: order line snapshot fields, not current `stocks` values.
+
+## Returns
+
+Returns are recorded separately from the original order. The Mongo return ledger preserves each original sale line and receipt, restores only the remaining eligible quantity, writes `STOCK_IN_RETURN` movements, and caps any debt reversal at the current outstanding balance. Reprocessing a fully returned order does not restore stock or debt again. Returned lines, debt changes, movement records, and the audit entry commit together.

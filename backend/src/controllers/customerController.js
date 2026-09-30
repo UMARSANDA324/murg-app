@@ -1,4 +1,4 @@
-const customerRepo = require('../repositories/customerRepository');
+const customerRepo = require('../repositories/customerRepositoryMongo');
 const { publishBranchEvent } = require('../services/realtimeService');
 const { success, created, error, notFound } = require('../utils/responseUtils');
 
@@ -61,7 +61,7 @@ class CustomerController {
   async recordDeposit(req, res, next) {
     try {
       const facilityID = req.branchId;
-      const customerId = parseInt(req.params.id);
+      const customerId = req.params.id;
       const { amount, paymentMethod, description } = req.body;
 
       if (!amount || parseFloat(amount) <= 0) {
@@ -97,7 +97,7 @@ class CustomerController {
   async getDeposits(req, res, next) {
     try {
       const facilityID = req.branchId;
-      const customerId = req.params.id ? parseInt(req.params.id) : null;
+      const customerId = req.params.id || null;
       const limit = req.query.limit ? parseInt(req.query.limit) : 50;
 
       const deposits = await customerRepo.getDepositHistory({ facilityID, customerId, limit });

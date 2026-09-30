@@ -1,5 +1,6 @@
-const db = require('../config/database');
-const stockRepo = require('../repositories/stockRepository');
+const stockRepo = require('../repositories/stockRepositoryMongo');
+const { mongoose } = require('../config/mongodb');
+const { recordAuditLog } = require('../services/auditLogService');
 const { publishBranchEvent } = require('../services/realtimeService');
 const { success, created, error, notFound } = require('../utils/responseUtils');
 
@@ -7,7 +8,7 @@ class StockController {
   async list(req, res, next) {
     try {
       const facilityID = req.branchId; // Enforced by requireBranchScope
-      const storeId = req.query.storeId ? parseInt(req.query.storeId) : null;
+      const storeId = req.query.storeId || null;
       const search = req.query.search || null;
       const status = req.query.status || 'active';
 
@@ -46,50 +47,66 @@ class StockController {
         return error(res, 'Selling price and buying price are required', 400);
       }
 
-      // Fetch old values for audit trail
-      const existing = await stockRepo.findById(stockId, facilityID);
-      if (!existing) {
-        return notFound(res, 'Stock item not found');
+      const sellingPrice = Number(selling);
+      const buyingPrice = Number(buying);
+      const yardPrice = price_per_yard === undefined || price_per_yard === null ? null : Number(price_per_yard);
+      const yardsPerBelt = yards_per_belt === undefined || yards_per_belt === null ? null : Number(yards_per_belt);
+      if (
+        !Number.isFinite(sellingPrice) || sellingPrice < 0 ||
+        !Number.isFinite(buyingPrice) || buyingPrice < 0 ||
+        (yardPrice !== null && (!Number.isFinite(yardPrice) || yardPrice < 0)) ||
+        (yardsPerBelt !== null && (!Number.isFinite(yardsPerBelt) || yardsPerBelt <= 0))
+      ) {
+        return error(res, 'Selling and buying prices must be valid non-negative numbers', 400);
       }
 
-      const updated = await stockRepo.updatePrice(
-        stockId,
-        {
-          selling,
-          buying,
-          price_per_yard: price_per_yard !== undefined ? parseFloat(price_per_yard) : null,
-          yards_per_belt: yards_per_belt !== undefined ? parseFloat(yards_per_belt) : null,
-        },
-        facilityID
-      );
-      if (!updated) {
-        return notFound(res, 'Stock item not found or price unchanged');
-      }
-
-      // Record in audit_logs
+      const session = await mongoose.startSession();
+      let existing;
       try {
-        await db.query(
-          `INSERT INTO audit_logs 
-           (facilityID, user_id, user_name, action, entity_type, entity_id, old_values, new_values, ip_address)
-           VALUES (?, ?, ?, 'PRICE_CHANGE', 'stocks', ?, ?, ?, ?)`,
-          [
-            facilityID,
-            req.user.id,
-            req.user.name,
+        await session.withTransaction(async () => {
+          existing = await stockRepo.findByIdForUpdate(session, stockId, facilityID);
+          if (!existing) return;
+
+          await stockRepo.updatePrice(
             stockId,
-            JSON.stringify({
+            {
+              selling: sellingPrice,
+              buying: buyingPrice,
+              price_per_yard: yardPrice,
+              yards_per_belt: yardsPerBelt,
+            },
+            facilityID,
+            session
+          );
+
+          await recordAuditLog({
+            facilityID,
+            user_id: req.user.id,
+            user_name: req.user.name,
+            action: 'PRICE_CHANGE',
+            entity_type: 'stocks',
+            entity_id: stockId,
+            old_values: {
               selling: existing.selling,
               buying: existing.buying,
               price_per_yard: existing.price_per_yard,
               yards_per_belt: existing.yards_per_belt,
-            }),
-            JSON.stringify({ selling, buying, price_per_yard, yards_per_belt, reason: reason || 'Price update' }),
-            req.ip,
-          ]
-        );
-      } catch (logErr) {
-        console.error('[Audit Log Error]', logErr.message);
+            },
+            new_values: {
+              selling: sellingPrice,
+              buying: buyingPrice,
+              price_per_yard: yardPrice,
+              yards_per_belt: yardsPerBelt,
+              reason: reason || 'Price update',
+            },
+            ip_address: req.ip,
+            user_agent: req.get('user-agent'),
+          }, session);
+        });
+      } finally {
+        await session.endSession();
       }
+      if (!existing) return notFound(res, 'Stock item not found');
 
       publishBranchEvent({
         branchIds: [facilityID],
@@ -118,50 +135,61 @@ class StockController {
         return error(res, 'price_per_yard or yards_per_belt is required', 400);
       }
 
-      const existing = await stockRepo.findById(stockId, facilityID);
-      if (!existing) {
-        return notFound(res, 'Stock item not found');
+      const requestedPricePerYard = price_per_yard === undefined ? undefined : Number(price_per_yard);
+      const requestedYardsPerBelt = yards_per_belt === undefined ? undefined : Number(yards_per_belt);
+      if (
+        (requestedPricePerYard !== undefined && (!Number.isFinite(requestedPricePerYard) || requestedPricePerYard < 0)) ||
+        (requestedYardsPerBelt !== undefined && (!Number.isFinite(requestedYardsPerBelt) || requestedYardsPerBelt <= 0))
+      ) {
+        return error(res, 'Yard price must be non-negative and yards per belt must be greater than zero', 400);
       }
 
-      const newPricePerYard = price_per_yard !== undefined ? parseFloat(price_per_yard) : existing.price_per_yard;
-      const newYardsPerBelt = yards_per_belt !== undefined ? parseFloat(yards_per_belt) : existing.yards_per_belt;
-
-      // Update in database (also updates selling price if this product is sold by yard)
-      await stockRepo.updateYardConfig(
-        stockId,
-        {
-          price_per_yard: newPricePerYard,
-          yards_per_belt: newYardsPerBelt,
-        },
-        facilityID
-      );
-
-      // Record in audit_logs
+      const session = await mongoose.startSession();
+      let currentStock;
+      let newPricePerYard;
+      let newYardsPerBelt;
       try {
-        await db.query(
-          `INSERT INTO audit_logs 
-           (facilityID, user_id, user_name, action, entity_type, entity_id, old_values, new_values, ip_address)
-           VALUES (?, ?, ?, 'YARD_CONFIG_CHANGE', 'stocks', ?, ?, ?, ?)`,
-          [
-            facilityID,
-            req.user.id,
-            req.user.name,
+        await session.withTransaction(async () => {
+          currentStock = await stockRepo.findByIdForUpdate(session, stockId, facilityID);
+          if (!currentStock) return;
+          newPricePerYard = requestedPricePerYard === undefined
+            ? currentStock.price_per_yard
+            : requestedPricePerYard;
+          newYardsPerBelt = requestedYardsPerBelt === undefined
+            ? currentStock.yards_per_belt
+            : requestedYardsPerBelt;
+
+          await stockRepo.updateYardConfig(
             stockId,
-            JSON.stringify({
-              price_per_yard: existing.price_per_yard,
-              yards_per_belt: existing.yards_per_belt,
-            }),
-            JSON.stringify({
+            { price_per_yard: newPricePerYard, yards_per_belt: newYardsPerBelt },
+            facilityID,
+            session
+          );
+
+          await recordAuditLog({
+            facilityID,
+            user_id: req.user.id,
+            user_name: req.user.name,
+            action: 'YARD_CONFIG_CHANGE',
+            entity_type: 'stocks',
+            entity_id: stockId,
+            old_values: {
+              price_per_yard: currentStock.price_per_yard,
+              yards_per_belt: currentStock.yards_per_belt,
+            },
+            new_values: {
               price_per_yard: newPricePerYard,
               yards_per_belt: newYardsPerBelt,
               reason: reason || 'Admin yard config update',
-            }),
-            req.ip,
-          ]
-        );
-      } catch (logErr) {
-        console.error('[Audit Log Error]', logErr.message);
+            },
+            ip_address: req.ip,
+            user_agent: req.get('user-agent'),
+          }, session);
+        });
+      } finally {
+        await session.endSession();
       }
+      if (!currentStock) return notFound(res, 'Stock item not found');
 
       publishBranchEvent({
         branchIds: [facilityID],
@@ -194,28 +222,38 @@ class StockController {
         unitType = 'belt',
       } = req.body;
 
-      if (!stockId || !quantity || !costPrice || !purchaseFrom) {
+      if (!stockId || quantity === undefined || costPrice === undefined || !purchaseFrom) {
         return error(res, 'Product, quantity, unit cost price, and supplier name are required', 400);
       }
 
-      const conn = await db.getConnection();
+      const parsedQuantity = Number(quantity);
+      const parsedCostPrice = Number(costPrice);
+      const parsedAmountPaid = Number(amountPaid);
+      if (
+        !Number.isFinite(parsedQuantity) || parsedQuantity <= 0 ||
+        !Number.isFinite(parsedCostPrice) || parsedCostPrice < 0 ||
+        !Number.isFinite(parsedAmountPaid) || parsedAmountPaid < 0
+      ) {
+        return error(res, 'Quantity, cost price, and amount paid must be valid non-negative numbers', 400);
+      }
+
+      const session = await mongoose.startSession();
       try {
-        await conn.beginTransaction();
-
-        const result = await stockRepo.receiveStock(conn, {
-          facilityID,
-          storeId: storeId ? parseInt(storeId) : null,
-          stockId: parseInt(stockId),
-          quantity: parseFloat(quantity),
-          costPrice: parseFloat(costPrice),
-          purchaseFrom: purchaseFrom.trim(),
-          forDesc: forDesc ? forDesc.trim() : '',
-          amountPaid: parseFloat(amountPaid) || 0,
-          performedBy: req.user.id,
-          unitType: unitType || 'belt',
+        let result;
+        await session.withTransaction(async () => {
+          result = await stockRepo.receiveStock(session, {
+            facilityID,
+            storeId: storeId || null,
+            stockId,
+            quantity: parsedQuantity,
+            costPrice: parsedCostPrice,
+            purchaseFrom: purchaseFrom.trim(),
+            forDesc: forDesc ? forDesc.trim() : '',
+            amountPaid: parsedAmountPaid,
+            performedBy: req.user.id,
+            unitType: unitType || 'belt',
+          });
         });
-
-        await conn.commit();
         publishBranchEvent({
           branchIds: [facilityID],
           type: 'branch-operation',
@@ -223,11 +261,8 @@ class StockController {
           referenceId: result.purchaseHistoryId,
         });
         return created(res, result, 'Stock receipt recorded successfully');
-      } catch (err) {
-        await conn.rollback();
-        throw err;
       } finally {
-        conn.release();
+        await session.endSession();
       }
     } catch (err) {
       next(err);
@@ -237,7 +272,7 @@ class StockController {
   async getMovements(req, res, next) {
     try {
       const facilityID = req.branchId;
-      const stockId = req.query.stockId ? parseInt(req.query.stockId) : null;
+      const stockId = req.query.stockId || null;
       const startDate = req.query.startDate || null;
       const endDate = req.query.endDate || null;
       const limit = req.query.limit ? parseInt(req.query.limit) : 500;
@@ -325,7 +360,7 @@ class StockController {
       }
 
       const updated = await stockRepo.updateStore(id, {
-        facilityID: branchId,
+        facilityID: user.isGlobalAdmin ? null : user.facilityID,
         storeName,
         branchId,
         status,
@@ -365,7 +400,7 @@ class StockController {
         return forbidden(res, 'You can only delete stores in your own branch');
       }
 
-      const deleted = await stockRepo.deleteStore(id, branchId);
+      const deleted = await stockRepo.deleteStore(id, user.isGlobalAdmin ? branchId : user.facilityID);
 
       if (!deleted) {
         return notFound(res, 'Store not found');

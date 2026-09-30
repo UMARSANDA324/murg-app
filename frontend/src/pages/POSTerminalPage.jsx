@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import api from '../services/api';
 import { useBranchStore } from '../store/useBranchStore';
 import {
@@ -17,6 +17,19 @@ import {
   X,
 } from 'lucide-react';
 
+function useDebounce(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+  return debouncedValue;
+}
+
 export default function POSTerminalPage() {
   const { activeBranch, activeBranchData } = useBranchStore();
   const isPerYard = activeBranchData?.sales_mode === 'PER_YARD';
@@ -27,6 +40,7 @@ export default function POSTerminalPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [selectedStore, setSelectedStore] = useState('');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 400);
   const [cart, setCart] = useState([]);
   const [buyerName, setBuyerName] = useState('');
   const [globalDiscount, setGlobalDiscount] = useState(0);
@@ -50,7 +64,7 @@ export default function POSTerminalPage() {
       fetchStocks();
       fetchCustomers();
     }
-  }, [activeBranch, selectedStore]);
+  }, [activeBranch, selectedStore, debouncedSearch]);
 
   const fetchStores = async () => {
     try {
@@ -78,7 +92,7 @@ export default function POSTerminalPage() {
     try {
       let url = `/stocks?branchId=${activeBranch}`;
       if (selectedStore) url += `&storeId=${selectedStore}`;
-      if (search) url += `&search=${encodeURIComponent(search)}`;
+      if (debouncedSearch) url += `&search=${encodeURIComponent(debouncedSearch)}`;
       const res = await api.get(url);
       setStocks(res.data.data || []);
     } catch (err) {
@@ -184,11 +198,11 @@ export default function POSTerminalPage() {
     setErrorMsg(null);
 
     try {
-      const selectedCustomer = customers.find(c => c.id === parseInt(selectedCustomerId));
+      const selectedCustomer = customers.find(c => String(c.id) === String(selectedCustomerId));
       const payload = {
         branchId: activeBranch,
         buyerName: buyerName || (selectedCustomer ? selectedCustomer.name : 'Retail Customer'),
-        customerId: selectedCustomerId ? parseInt(selectedCustomerId) : null,
+        customerId: selectedCustomerId || null,
         customerName: selectedCustomer ? selectedCustomer.name : null,
         items: cart.map((item) => ({
           stockId: item.stockId,
@@ -252,7 +266,6 @@ export default function POSTerminalPage() {
               placeholder="Search fabric, shadda, lace by name..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && fetchStocks()}
               className="w-full bg-slate-50 border border-slate-300 rounded-lg py-2 pl-9 pr-3 text-sm focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
             />
           </div>
@@ -369,7 +382,7 @@ export default function POSTerminalPage() {
                 value={selectedCustomerId}
                 onChange={(e) => {
                   setSelectedCustomerId(e.target.value);
-                  const cust = customers.find(c => c.id === parseInt(e.target.value));
+                  const cust = customers.find(c => String(c.id) === String(e.target.value));
                   if (cust) setBuyerName(cust.name);
                 }}
                 className="w-full bg-white border border-amber-300 rounded-lg py-1.5 px-2 text-xs font-medium focus:ring-1 focus:ring-amber-500"
