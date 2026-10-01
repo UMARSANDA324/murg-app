@@ -8,7 +8,10 @@ class CustomerController {
       const facilityID = req.branchId;
       const search = req.query.search || null;
       const customers = await customerRepo.findAll({ facilityID, search });
-      return success(res, customers);
+      const responseCustomers = req.user.role === 'Admin'
+        ? customers
+        : customers.map(({ outstanding_balance, total_deposited, ...customer }) => customer);
+      return success(res, responseCustomers);
     } catch (err) {
       next(err);
     }
@@ -102,6 +105,19 @@ class CustomerController {
 
       const deposits = await customerRepo.getDepositHistory({ facilityID, customerId, limit });
       return success(res, deposits);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getDebtHistory(req, res, next) {
+    try {
+      const facilityID = req.branchId;
+      const customerId = req.params.id;
+      const limit = req.query.limit ? parseInt(req.query.limit) : 100;
+
+      const history = await customerRepo.getDebtHistory({ facilityID, customerId, limit });
+      return success(res, history);
     } catch (err) {
       next(err);
     }

@@ -12,6 +12,15 @@ const expenseSchema = new mongoose.Schema({
   price: Number,
   type: String,
   date: Date,
+  isArchived: {
+    type: Boolean,
+    default: false,
+  },
+  archivedAt: Date,
+  archivedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
   createdAt: {
     type: Date,
     default: Date.now,

@@ -30,7 +30,7 @@ The MURG Textile Enterprises application uses MongoDB Atlas as the runtime datab
 | `goods_requests` | Request identity, product/source, branch, quantity, status, approval/release and receipt fields |
 | `notifications` | User/role/branch-targeted in-app notifications and read state |
 | `shipment_receipts` | Approved logistics receipt and one-time consumption/release state |
-| `expenses` | Branch expense tracking |
+| `expenses` | Branch expense tracking; soft archive fields preserve historical rows |
 | `returns` | Return processing records with stock restoration and debt reversal |
 
 ## Key Relationships
@@ -40,6 +40,15 @@ The MURG Textile Enterprises application uses MongoDB Atlas as the runtime datab
 - `orders.stockID` identifies the stock/product line, while `orderID` groups lines into one transaction
 - `stock_movements.reference_type/reference_id` point to business records without universal foreign keys
 - Customer/debt relations are application-enforced through repository logic
+
+## Financial Reporting Sources
+
+- `orders.net_total` is the persisted order-level net total; line-level `subtotal` and `item_discount` are historical snapshots.
+- `purchase_history.total_cost` records purchase value; `amount_paid` records cash paid toward it.
+- `expenses.type` contains `in` and `out` values and remains separately reported.
+- `debts.balance` is a current receivable snapshot; deposits are recorded separately.
+- Current inventory buying-price value uses `stocks.quantity × stocks.buying`. It is not a full business-capital measure.
+- Orders do not store a sale-time cost basis, so current stock buying price is not a reliable historical COGS source.
 
 ## Transaction Strategy
 

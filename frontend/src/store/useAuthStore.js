@@ -29,6 +29,9 @@ export const useAuthStore = create((set, get) => ({
         const response = await api.get('/auth/me');
         const user = response.data.data;
         localStorage.setItem('murg_user', JSON.stringify(user));
+        if (!user.isGlobalAdmin && user.facilityID) {
+          localStorage.setItem('murg_active_branch', user.facilityID);
+        }
         set({ token, user, isAuthenticated: true, authReady: true, authError: null });
       } catch (err) {
         const isNetworkFailure = !err.response || err.code === 'ERR_NETWORK' || /ECONNRESET|proxy|network/i.test(err.message || '');
@@ -74,6 +77,9 @@ export const useAuthStore = create((set, get) => ({
 
       localStorage.setItem('murg_token', token);
       localStorage.setItem('murg_user', JSON.stringify(user));
+      if (!user.isGlobalAdmin && user.facilityID) {
+        localStorage.setItem('murg_active_branch', user.facilityID);
+      }
 
       set({
         token,

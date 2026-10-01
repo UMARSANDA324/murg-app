@@ -7,14 +7,20 @@ export const useBranchStore = create((set, get) => ({
   activeBranchData: null,
   loading: false,
 
-  fetchBranches: async () => {
+  fetchBranches: async (currentUser = null) => {
     set({ loading: true });
     try {
       const res = await api.get('/branches');
       const branches = res.data.data || [];
       set({ branches, loading: false });
 
-      // If no active branch is set or current active branch is invalid, set to first branch
+      // If user is a branch staff/cashier (not global admin), strictly lock activeBranch to their assigned facilityID
+      if (currentUser && !currentUser.isGlobalAdmin && currentUser.facilityID) {
+        get().setActiveBranch(currentUser.facilityID);
+        return;
+      }
+
+      // For Global Admin: if no active branch is set or current active branch is invalid, set to first branch
       const currentActive = get().activeBranch;
       if (!currentActive && branches.length > 0) {
         get().setActiveBranch(branches[0].facilityID);

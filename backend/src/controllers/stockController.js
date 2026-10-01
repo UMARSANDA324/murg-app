@@ -11,8 +11,9 @@ class StockController {
       const storeId = req.query.storeId || null;
       const search = req.query.search || null;
       const status = req.query.status || 'active';
+      const includeCost = Boolean(req.user?.isGlobalAdmin || req.user?.role === 'Admin');
 
-      const stocks = await stockRepo.findAll({ facilityID, storeId, search, status });
+      const stocks = await stockRepo.findAll({ facilityID, storeId, search, status, includeCost });
       return success(res, stocks);
     } catch (err) {
       next(err);
@@ -22,12 +23,88 @@ class StockController {
   async get(req, res, next) {
     try {
       const facilityID = req.branchId;
-      const stock = await stockRepo.findById(req.params.id, facilityID);
+      const includeCost = Boolean(req.user?.isGlobalAdmin || req.user?.role === 'Admin');
+      const stock = await stockRepo.findById(req.params.id, facilityID, includeCost);
       if (!stock) {
         return notFound(res, 'Stock item not found');
       }
       return success(res, stock);
     } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * Create brand new catalog product in current branch (Admin Only).
+   */
+  async create(req, res, next) {
+    try {
+      const facilityID = req.branchId;
+      const {
+        name,
+        storeId,
+        quantity = 0,
+        buying = 0,
+        selling = 0,
+        unit_type = 'belt',
+        price_per_yard,
+        yards_per_belt = 100,
+      } = req.body;
+
+      if (!name || !name.trim()) {
+        return error(res, 'Product name is required', 400);
+      }
+      const quantityValue = Number(quantity);
+      const buyingValue = Number(buying);
+      const sellingValue = Number(selling);
+      const yardPriceValue = price_per_yard === undefined || price_per_yard === null || price_per_yard === ''
+        ? null
+        : Number(price_per_yard);
+      const yardsPerBeltValue = yards_per_belt === undefined || yards_per_belt === null || yards_per_belt === ''
+        ? 100
+        : Number(yards_per_belt);
+      if (!Number.isFinite(quantityValue) || quantityValue < 0) {
+        return error(res, 'Quantity must be a valid non-negative number', 400);
+      }
+      if (!Number.isFinite(sellingValue) || sellingValue < 0) {
+        return error(res, 'Selling price must be a valid non-negative number', 400);
+      }
+      if (!Number.isFinite(buyingValue) || buyingValue < 0) {
+        return error(res, 'Buying price must be a valid non-negative number', 400);
+      }
+      if (
+        (yardPriceValue !== null && (!Number.isFinite(yardPriceValue) || yardPriceValue < 0)) ||
+        !Number.isFinite(yardsPerBeltValue) || yardsPerBeltValue <= 0 ||
+        !['belt', 'yard'].includes(unit_type)
+      ) {
+        return error(res, 'Unit and yard configuration values are invalid', 400);
+      }
+
+      const stock = await stockRepo.createStock({
+        facilityID,
+        name: name.trim(),
+        storeId: storeId || null,
+        quantity: quantityValue,
+        buying: buyingValue,
+        selling: sellingValue,
+        unit_type,
+        price_per_yard: yardPriceValue,
+        yards_per_belt: yardsPerBeltValue,
+        performedBy: req.user.id,
+      });
+
+      publishBranchEvent({
+        branchIds: [facilityID],
+        type: 'branch-operation',
+        operation: 'STOCK_CREATED',
+        referenceId: String(stock._id),
+      });
+
+      return created(res, stock, 'Product created successfully');
+    } catch (err) {
+      if (err.message && err.message.includes('already exists')) {
+        return error(res, err.message, 409);
+      }
       next(err);
     }
   }

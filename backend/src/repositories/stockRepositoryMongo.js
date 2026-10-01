@@ -9,8 +9,9 @@ const { reserveLegacyIds } = require('../services/legacyIdService');
 class StockRepositoryMongo {
   /**
    * List all stocks for a branch, optionally filtered by store.
+   * Strips buying price unless caller is authorized Admin (includeCost: true).
    */
-  async findAll({ facilityID, storeId = null, search = null, status = 'active' } = {}) {
+  async findAll({ facilityID, storeId = null, search = null, status = 'active', includeCost = false } = {}) {
     const query = { facilityID };
     if (status) query.status = status;
     if (storeId) query.store_id = storeId;
@@ -24,24 +25,34 @@ class StockRepositoryMongo {
       .sort({ name: 1 })
       .lean();
 
-    return stocks.map(s => ({
-      ...s,
-      id: s._id.toString(),
-      store_id: s.store_id?._id?.toString() || s.store_id?.toString() || null,
-      quantity: parseFloat(s.quantity) || 0,
-      buying: parseFloat(s.buying) || 0,
-      selling: parseFloat(s.selling) || 0,
-      price_per_yard: s.price_per_yard !== null && s.price_per_yard !== undefined ? parseFloat(s.price_per_yard) : null,
-      yards_per_belt: s.yards_per_belt !== null && s.yards_per_belt !== undefined ? parseFloat(s.yards_per_belt) : null,
-      store_name: s.store_id?.store_name || null,
-      store_status: s.store_id?.status || null,
-    }));
+    return stocks.map(s => {
+      const item = {
+        ...s,
+        id: s._id.toString(),
+        store_id: s.store_id?._id?.toString() || s.store_id?.toString() || null,
+        quantity: parseFloat(s.quantity) || 0,
+        selling: parseFloat(s.selling) || 0,
+        price_per_yard: s.price_per_yard !== null && s.price_per_yard !== undefined ? parseFloat(s.price_per_yard) : null,
+        yards_per_belt: s.yards_per_belt !== null && s.yards_per_belt !== undefined ? parseFloat(s.yards_per_belt) : null,
+        store_name: s.store_id?.store_name || null,
+        store_status: s.store_id?.status || null,
+      };
+      if (includeCost) {
+        item.buying = parseFloat(s.buying) || 0;
+        item.Bsubtotal = s.Bsubtotal !== undefined ? parseFloat(s.Bsubtotal) : (item.buying * item.quantity);
+      } else {
+        delete item.buying;
+        delete item.Bsubtotal;
+      }
+      return item;
+    });
   }
 
   /**
    * Get a single stock item, scoped to branch.
+   * Strips buying price unless caller is authorized Admin (includeCost: true).
    */
-  async findById(id, facilityID) {
+  async findById(id, facilityID, includeCost = false) {
     if (!mongoose.Types.ObjectId.isValid(id)) return null;
     const stock = await Stock.findOne({ _id: id, facilityID })
       .populate('store_id', 'store_name status')
@@ -49,17 +60,24 @@ class StockRepositoryMongo {
     
     if (!stock) return null;
     
-    return {
+    const item = {
       ...stock,
       id: stock._id.toString(),
       store_id: stock.store_id?._id?.toString() || stock.store_id?.toString() || null,
       quantity: parseFloat(stock.quantity) || 0,
-      buying: parseFloat(stock.buying) || 0,
       selling: parseFloat(stock.selling) || 0,
       price_per_yard: stock.price_per_yard !== null && stock.price_per_yard !== undefined ? parseFloat(stock.price_per_yard) : null,
       yards_per_belt: stock.yards_per_belt !== null && stock.yards_per_belt !== undefined ? parseFloat(stock.yards_per_belt) : null,
       store_name: stock.store_id?.store_name || null,
     };
+    if (includeCost) {
+      item.buying = parseFloat(stock.buying) || 0;
+      item.Bsubtotal = stock.Bsubtotal !== undefined ? parseFloat(stock.Bsubtotal) : (item.buying * item.quantity);
+    } else {
+      delete item.buying;
+      delete item.Bsubtotal;
+    }
+    return item;
   }
 
   /**
@@ -493,6 +511,104 @@ class StockRepositoryMongo {
       name: s.name,
       unit_type: s.unit_type,
     }));
+  }
+
+  /**
+   * Create a brand new catalog product in the specified branch (Admin Only).
+   * Atomically creates Stock, registers legacy mysqlId, and records initial StockMovement.
+   */
+  async createStock({
+    facilityID,
+    name,
+    storeId = null,
+    quantity = 0,
+    buying = 0,
+    selling = 0,
+    unit_type = 'belt',
+    price_per_yard = null,
+    yards_per_belt = 100,
+    status = 'active',
+    performedBy = null,
+  }) {
+    const session = await mongoose.startSession();
+    let createdStock;
+    try {
+      await session.withTransaction(async () => {
+        // Validate branch existence
+        const branch = await Branch.findOne({ facilityID }).session(session).lean();
+        if (!branch) {
+          throw new Error('Branch not found');
+        }
+
+        // Check for duplicate product name in this branch
+        const cleanName = name.trim();
+        const existing = await Stock.findOne({
+          facilityID,
+          name: { $regex: new RegExp(`^${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        }).session(session);
+        if (existing) {
+          throw new Error(`A product named "${cleanName}" already exists in this branch.`);
+        }
+
+        if (storeId) {
+          if (!mongoose.Types.ObjectId.isValid(storeId) || !await Store.exists({ _id: storeId, branch_id: facilityID }).session(session)) {
+            throw new Error('Store not found for this branch');
+          }
+        }
+
+        const qty = parseFloat(quantity) || 0;
+        const buyPrice = parseFloat(buying) || 0;
+        const sellPrice = parseFloat(selling) || 0;
+        const yardPrice = price_per_yard !== null && price_per_yard !== undefined && price_per_yard !== '' ? parseFloat(price_per_yard) : null;
+        const ypb = yards_per_belt ? parseFloat(yards_per_belt) : 100;
+
+        const [mysqlId] = await reserveLegacyIds(Stock, 'stockId', 1, session);
+        const [stock] = await Stock.create([
+          {
+            facilityID,
+            name: cleanName,
+            store_id: storeId || null,
+            quantity: qty,
+            opening_quantity: qty,
+            buying: buyPrice,
+            selling: sellPrice,
+            unit_type: unit_type || (branch.sales_mode === 'PER_YARD' ? 'yard' : 'belt'),
+            price_per_yard: yardPrice,
+            yards_per_belt: ypb,
+            status: status || 'active',
+            Bsubtotal: buyPrice * qty,
+            Ssubtotal: sellPrice * qty,
+            mysqlId,
+          }
+        ], { session });
+
+        createdStock = stock;
+
+        // Record initial stock movement if quantity > 0
+        if (qty > 0) {
+          const [movementMysqlId] = await reserveLegacyIds(StockMovement, 'stockMovementId', 1, session);
+          await StockMovement.create([
+            {
+              facilityID,
+              store_id: storeId || null,
+              stock_id: stock._id,
+              movement_type: 'STOCK_INITIAL',
+              quantity_change: qty,
+              quantity_before: 0,
+              quantity_after: qty,
+              reference_type: 'initial_stock',
+              reference_id: String(stock._id),
+              notes: `Initial stock created by Admin: ${qty} ${stock.unit_type}`,
+              performed_by: performedBy,
+              mysqlId: movementMysqlId,
+            }
+          ], { session });
+        }
+      });
+      return createdStock;
+    } finally {
+      await session.endSession();
+    }
   }
 }
 

@@ -13,6 +13,7 @@ const orderSchema = new mongoose.Schema({
     ref: 'Stock',
   },
   item: String,
+  productName: String,
   quantity: Number,
   subtotal: Number,
   price: Number,

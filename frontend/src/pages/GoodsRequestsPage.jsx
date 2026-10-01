@@ -444,7 +444,13 @@ export default function GoodsRequestsPage() {
       const res = await api.get(url);
       setRequests(res.data.data || []);
     } catch (err) {
-      setFetchError('Unable to load goods requests.');
+      if (err.response?.status === 401) {
+        setFetchError('Authentication required. Please log in again.');
+      } else if (err.response?.status === 403) {
+        setFetchError('Access denied. Administrator access required for this view.');
+      } else {
+        setFetchError('Unable to load goods requests.');
+      }
     } finally {
       setLoading(false);
     }

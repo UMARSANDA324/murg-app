@@ -27,6 +27,7 @@ Unknown routes render `NotFoundPage` (404).
 - **Direct URL support**: `/login` and other routes work correctly when accessed directly or refreshed
 - **Authentication**: `/login` redirects to dashboard only if already authenticated; authenticated users cannot access `/login`
 - **Role-based access**: Admin-only routes (`/management`, `/staff`, `/branches`) are protected at the route level
+- Financial overview/print reports are available at Admin-only `/reports`; Staff/Cashier navigation excludes management/reporting pages and direct route access redirects to POS.
 - **Unknown routes**: Render a 404 page instead of redirecting to dashboard
 
 ## State and HTTP
@@ -44,6 +45,7 @@ Unknown routes render `NotFoundPage` (404).
 | Feature | UI | API family | Main data |
 |---|---|---|---|
 | Dashboard and DAS/WAS/MAS | `DashboardPage` | branches, analytics | orders, stocks, shipments, debts |
+| Admin financial and print reports | `FinancialReportsPage` | Admin-only analytics financial/debt/history endpoints | orders, purchases, expenses, debts, stocks, stock_movements |
 | POS and receipt after checkout | `POSTerminalPage` | stocks, customers, sales | stocks, orders, outstand |
 | Stock/current inventory and movement history | `StockPage` | stocks, sales receipts | stocks, stock_movements, orders |
 | Customers/deposits | `CustomersPage` | customers | customers, outstand, deposit_history |

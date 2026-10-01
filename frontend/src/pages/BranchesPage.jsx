@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import { useBranchStore } from '../store/useBranchStore';
 import {
-  Building2,
   Plus,
   Edit2,
   CheckCircle2,
@@ -27,7 +26,7 @@ export default function BranchesPage() {
 
   useEffect(() => {
     fetchBranches();
-  }, []);
+  }, [fetchBranches]);
 
   const handleOpenCreate = () => {
     setEditMode(false);
@@ -71,8 +70,10 @@ export default function BranchesPage() {
 
   const handleToggleStatus = async (branch) => {
     const nextStatus = branch.status === 'active' ? 'inactive' : 'active';
-    const action = nextStatus === 'active' ? 'activate' : 'deactivate';
-    if (!window.confirm(`Are you sure you want to ${action} branch "${branch.name}"?`)) return;
+    const warning = nextStatus === 'inactive'
+      ? `Deactivate branch "${branch.name}"? New branch-scoped operations will be blocked for its staff. Historical transactions and records will be preserved; this does not permanently delete the branch.`
+      : `Activate branch "${branch.name}"?`;
+    if (!window.confirm(warning)) return;
 
     try {
       await api.patch(`/branches/${branch.facilityID}/status`, { status: nextStatus });

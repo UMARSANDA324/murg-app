@@ -71,17 +71,9 @@ function buildPeriodMetrics(start, end, normalSale, debtSale) {
 }
 
 /**
- * AnalyticsRepository — Sales activity metrics (DAS/WAS/MAS)
- * MongoDB aggregation covering both normal and debt sales.
- * All queries support facilityID scoping for branch isolation,
- * or cross-branch aggregation for Global Admin.
- * Uses official business timezone: Africa/Lagos (+01:00).
+ * MongoDB sales activity analytics using the Africa/Lagos business timezone.
  */
 class AnalyticsRepository {
-  /**
-  * Get date boundaries for target day, calendar week (Mon-Sun), and month in Africa/Lagos.
-   * @param {string|null} targetDate - Optional YYYY-MM-DD
-   */
   async getDateBoundaries(targetDate = null) {
     const today = targetDate || currentBusinessDate();
     const parsedToday = parseDate(today);
@@ -101,10 +93,6 @@ class AnalyticsRepository {
     };
   }
 
-  /**
-   * Unified authoritative aggregation for DAS, WAS, MAS and sales/debt breakdown.
-   * Scoped by facilityID if provided, or entire application if null.
-   */
   async getSalesActivity({ facilityID = null, date, weekStart, weekEnd, monthStart, monthEnd }) {
     const dayStart = businessDayStart(date);
     const dayEnd = businessDayStart(addDays(date, 1));
@@ -161,35 +149,32 @@ class AnalyticsRepository {
         },
       },
     ]);
-    const r = rows[0] || {};
+    const row = rows[0] || {};
 
     return {
-      das: parseInt(r.das || 0),
-      was: parseInt(r.was || 0),
-      mas: parseInt(r.mas || 0),
+      das: parseInt(row.das || 0),
+      was: parseInt(row.was || 0),
+      mas: parseInt(row.mas || 0),
       breakdown: {
         daily: {
-          normalSales: parseInt(r.das_normal || 0),
-          debtSales: parseInt(r.das_debt || 0),
-          total: parseInt(r.das || 0),
+          normalSales: parseInt(row.das_normal || 0),
+          debtSales: parseInt(row.das_debt || 0),
+          total: parseInt(row.das || 0),
         },
         weekly: {
-          normalSales: parseInt(r.was_normal || 0),
-          debtSales: parseInt(r.was_debt || 0),
-          total: parseInt(r.was || 0),
+          normalSales: parseInt(row.was_normal || 0),
+          debtSales: parseInt(row.was_debt || 0),
+          total: parseInt(row.was || 0),
         },
         monthly: {
-          normalSales: parseInt(r.mas_normal || 0),
-          debtSales: parseInt(r.mas_debt || 0),
-          total: parseInt(r.mas || 0),
+          normalSales: parseInt(row.mas_normal || 0),
+          debtSales: parseInt(row.mas_debt || 0),
+          total: parseInt(row.mas || 0),
         },
       },
     };
   }
 
-  /**
-   * Backward-compatible convenience methods
-   */
   async getDailyActiveSales({ facilityID, date }) {
     const bounds = await this.getDateBoundaries(date);
     const metrics = await this.getSalesActivity({ facilityID, ...bounds });

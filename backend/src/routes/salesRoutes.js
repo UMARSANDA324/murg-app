@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const salesController = require('../controllers/salesController');
-const { authenticate, requireBranchScope } = require('../middleware/auth');
+const { authenticate, requireBranchScope, requireAdmin } = require('../middleware/auth');
 
 router.use(authenticate);
 
@@ -11,9 +11,9 @@ router.get('/:orderId/receipt', salesController.getReceipt);
 // Branch-scoped POS operations require requireBranchScope
 router.use(requireBranchScope);
 
-router.get('/', salesController.list);
-router.get('/by-date', salesController.getSalesByDate);
+router.get('/', requireAdmin, salesController.list);
+router.get('/by-date', requireAdmin, salesController.getSalesByDate);
 router.post('/checkout', salesController.checkout);
-router.get('/:orderId/items', salesController.getOrderItems);
+router.get('/:orderId/items', requireAdmin, salesController.getOrderItems);
 
 module.exports = router;

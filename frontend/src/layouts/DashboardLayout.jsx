@@ -26,6 +26,7 @@ import {
   Info,
   DollarSign,
   Undo2,
+  BarChart3,
 } from 'lucide-react';
 
 // ─── Notification type → icon + nav destination ───────────────────────────────
@@ -85,7 +86,7 @@ export default function DashboardLayout() {
   }, []);
 
   useEffect(() => {
-    fetchBranches();
+    fetchBranches(user);
     fetchNotificationData();
 
     // Poll unread count every 30 seconds to catch new notifications from other sessions
@@ -207,22 +208,17 @@ export default function DashboardLayout() {
     navigate('/login');
   };
 
+  const isAdmin = user?.isGlobalAdmin || user?.role === 'Admin';
   const navItems = [
-    { label: 'Dashboard', path: '/', icon: LayoutDashboard },
+    ...(isAdmin ? [{ label: 'Dashboard', path: '/', icon: LayoutDashboard }] : []),
     { label: 'POS Terminal', path: '/pos', icon: ShoppingCart },
-    { label: 'Stock & Inventory', path: '/stock', icon: Package },
-    { label: 'Shipments & Transfers', path: '/shipments', icon: Truck },
     { label: 'Goods Requests', path: '/goods-requests', icon: FileCheck2 },
-    { label: 'Customers & Debts', path: '/customers', icon: Users },
-    { label: 'Expenses', path: '/expenses', icon: DollarSign },
     { label: 'Returns', path: '/returns', icon: Undo2 },
+    ...(isAdmin ? [
+      { label: 'Management', path: '/management', icon: ShieldCheck },
+      { label: 'Financial Reports', path: '/reports', icon: BarChart3 },
+    ] : []),
   ];
-
-  if (user?.isGlobalAdmin || user?.role === 'Admin') {
-    navItems.push({ label: 'Staff & Roles', path: '/staff', icon: UserCheck });
-    navItems.push({ label: 'Branch Management', path: '/branches', icon: Building2 });
-    navItems.push({ label: 'Management', path: '/management', icon: ShieldCheck });
-  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row print:block">
@@ -277,14 +273,17 @@ export default function DashboardLayout() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Navbar */}
         <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-xs print:hidden">
-          {/* Mobile hamburger */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100 cursor-pointer"
-            aria-label="Toggle menu"
-          >
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          {/* Mobile hamburger & Brand */}
+          <div className="flex items-center gap-2 md:hidden">
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 cursor-pointer"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+            <span className="font-bold text-slate-900 text-sm tracking-tight">MURG</span>
+          </div>
 
           {/* Branch Selector */}
           <div className="flex items-center gap-3">

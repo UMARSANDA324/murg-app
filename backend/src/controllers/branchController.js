@@ -1,4 +1,6 @@
 const branchRepo = require('../repositories/branchRepositoryMongo');
+const { mongoose } = require('../config/mongodb');
+const { recordAuditLog } = require('../services/auditLogService');
 const { success, created, error, notFound } = require('../utils/responseUtils');
 
 class BranchController {
@@ -72,9 +74,30 @@ class BranchController {
         return error(res, 'Status must be active or inactive', 400);
       }
 
-      const updated = await branchRepo.setStatus(branchId, status);
-      if (!updated) {
+      const branch = await branchRepo.findByFacilityID(branchId);
+      if (!branch) {
         return notFound(res, 'Branch not found');
+      }
+      const session = await mongoose.startSession();
+      try {
+        await session.withTransaction(async () => {
+          const updated = await branchRepo.setStatus(branchId, status, session);
+          if (!updated) throw new Error('Branch not found');
+          await recordAuditLog({
+            facilityID: branchId,
+            user_id: req.user.id,
+            user_name: req.user.name,
+            action: status === 'inactive' ? 'BRANCH_DEACTIVATED' : 'BRANCH_ACTIVATED',
+            entity_type: 'branches',
+            entity_id: branchId,
+            old_values: { status: branch.status },
+            new_values: { status },
+            ip_address: req.ip,
+            user_agent: req.get('user-agent'),
+          }, session);
+        });
+      } finally {
+        await session.endSession();
       }
       return success(res, null, `Branch ${status === 'active' ? 'activated' : 'deactivated'} successfully`);
     } catch (err) {
