@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const expenseController = require('../controllers/expenseController');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireAdmin } = require('../middleware/auth');
 
-router.use(authenticate);
+router.use(authenticate, requireAdmin);
 
 router.get('/', expenseController.list);
 router.get('/totals', expenseController.getTotals);

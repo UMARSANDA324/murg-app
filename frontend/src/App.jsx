@@ -5,6 +5,7 @@ import DashboardLayout from './layouts/DashboardLayout';
 import LoginPage from './pages/LoginPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import DashboardPage from './pages/DashboardPage';
+import FinancialReportsPage from './pages/FinancialReportsPage';
 import POSTerminalPage from './pages/POSTerminalPage';
 import StockPage from './pages/StockPage';
 import ShipmentsPage from './pages/ShipmentsPage';
@@ -26,7 +27,7 @@ function ProtectedRoute({ children, adminOnly = false }) {
   }
 
   if (adminOnly && !user?.isGlobalAdmin && user?.role !== 'Admin') {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/pos" replace />;
   }
 
   return children;
@@ -68,14 +69,64 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<DashboardPage />} />
-          <Route path="dashboard" element={<DashboardPage />} />
+          <Route
+            index
+            element={
+              <ProtectedRoute adminOnly>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="dashboard"
+            element={
+              <ProtectedRoute adminOnly>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="reports"
+            element={
+              <ProtectedRoute adminOnly>
+                <FinancialReportsPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="pos" element={<POSTerminalPage />} />
-          <Route path="stock" element={<StockPage />} />
-          <Route path="shipments" element={<ShipmentsPage />} />
+          <Route
+            path="stock"
+            element={
+              <ProtectedRoute adminOnly>
+                <StockPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="shipments"
+            element={
+              <ProtectedRoute adminOnly>
+                <ShipmentsPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="goods-requests" element={<GoodsRequestsPage />} />
-          <Route path="customers" element={<CustomersPage />} />
-          <Route path="expenses" element={<ExpensesPage />} />
+          <Route
+            path="customers"
+            element={
+              <ProtectedRoute adminOnly>
+                <CustomersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="expenses"
+            element={
+              <ProtectedRoute adminOnly>
+                <ExpensesPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="returns" element={<ReturnsPage />} />
           <Route
             path="management"

@@ -15,12 +15,12 @@ const repositoryContracts = [
   ['shipment receipt', require('../../src/repositories/shipmentReceiptRepository'), ['findByReceiptCode', 'verifyAndReleaseReceipt']],
   ['returns', require('../../src/repositories/returnsRepositoryMongo'), ['validateOrderForReturn', 'processOrderReturn']],
   ['customer', require('../../src/repositories/customerRepositoryMongo'), ['findAll', 'findById', 'create', 'recordDeposit', 'getDepositHistory']],
-  ['expense', require('../../src/repositories/expenseRepositoryMongo'), ['getExpenses', 'getExpenseById', 'createExpense', 'updateExpense', 'deleteExpense', 'getExpenseTotals', 'getTodayTotals', 'getAllTimeTotals']],
+  ['expense', require('../../src/repositories/expenseRepositoryMongo'), ['getExpenses', 'getExpenseById', 'createExpense', 'updateExpense', 'archiveExpense', 'getExpenseTotals', 'getTodayTotals', 'getAllTimeTotals']],
   ['notification', require('../../src/repositories/notificationRepositoryMongo'), ['getForUser', 'getUnreadCount', 'markAsRead', 'markAllAsRead', 'markListAsRead', 'create']],
 ];
 
 test('accepts only the dedicated murg_test database', () => {
-  const uri = 'mongodb+srv://test-user:test-password@example.mongodb.net/murg_test?retryWrites=true&w=majority';
+  const uri = 'mongodb+srv://example.mongodb.net/murg_test?retryWrites=true&w=majority';
 
   assert.equal(getTestDatabaseName(uri), EXPECTED_TEST_DATABASE);
 });

@@ -403,7 +403,7 @@ export default function StockPage() {
                       ₦{s.selling.toLocaleString()}
                     </td>
                     <td className="py-3 px-3 text-right text-slate-500">
-                      ₦{s.buying.toLocaleString()}
+                      {s.buying !== undefined && s.buying !== null ? `₦${s.buying.toLocaleString()}` : '-'}
                     </td>
                     <td className="py-3 px-3 text-center">
                       {user?.isGlobalAdmin || user?.role === 'Admin' ? (

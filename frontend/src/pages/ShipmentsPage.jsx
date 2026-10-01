@@ -13,6 +13,7 @@ import {
   Building2,
   X,
   AlertTriangle,
+  Printer,
 } from 'lucide-react';
 
 export default function ShipmentsPage() {
@@ -356,17 +357,28 @@ export default function ShipmentsPage() {
       {/* Inspect & Receive Modal */}
       {inspectModalOpen && inspectingShipment && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-auto">
+          <div id="shipment-manifest-print" className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-auto">
             <button
               onClick={() => setInspectModalOpen(false)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600"
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 print:hidden"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <h3 className="text-base font-bold text-slate-900 mb-1">
-              Transfer Manifest: {inspectingShipment.tracking_number}
-            </h3>
+            <div className="flex items-start justify-between gap-3 mb-1">
+              <h3 className="text-base font-bold text-slate-900 m-0">
+                Transfer Manifest: {inspectingShipment.tracking_number}
+              </h3>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="print:hidden inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs cursor-pointer transition-colors"
+                title="Print transfer manifest"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Print</span>
+              </button>
+            </div>
             <p className="text-xs text-slate-500 mb-4">
               From: {inspectingShipment.source_branch_name} $\to$ To: {inspectingShipment.destination_branch_name}
             </p>
@@ -407,7 +419,7 @@ export default function ShipmentsPage() {
             </div>
 
             {inspectingShipment.status === 'In Transit' && inspectingShipment.destination_branch === activeBranch ? (
-              <div className="flex gap-2">
+              <div className="flex gap-2 print:hidden">
                 <button
                   onClick={handleConfirmReceive}
                   disabled={receivingSaving}
@@ -426,7 +438,7 @@ export default function ShipmentsPage() {
             ) : (
               <button
                 onClick={() => setInspectModalOpen(false)}
-                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-lg text-xs"
+                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-lg text-xs print:hidden"
               >
                 Close Manifest
               </button>

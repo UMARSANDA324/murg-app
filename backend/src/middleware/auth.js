@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { User } = require('../models');
+const { Branch } = require('../models');
 const { unauthorized, forbidden } = require('../utils/responseUtils');
 const { JWT_SECRET } = require('../config/auth');
 const { mongoose: appMongoose } = require('../config/mongodb');
@@ -75,10 +76,10 @@ async function authenticate(req, res, next) {
  * After this middleware runs:
  *   req.branchId — the verified, safe branch to scope queries to.
  */
-function requireBranchScope(req, res, next) {
+async function requireBranchScope(req, res, next) {
   const user = req.user;
   const requestedBranch =
-    req.params.branchId || req.query.branchId || req.body.branchId || req.body.facilityID;
+    req.params?.branchId || req.query?.branchId || req.body?.branchId || req.body?.facilityID;
 
   // Global Admin: can target any branch
   if (user.isGlobalAdmin) {
@@ -89,6 +90,11 @@ function requireBranchScope(req, res, next) {
   // Branch user: may only access their own branch
   if (requestedBranch && requestedBranch !== user.facilityID) {
     return forbidden(res, 'Access denied: You cannot access data for another branch.');
+  }
+
+  const branch = await Branch.findOne({ facilityID: user.facilityID }).select('status').lean();
+  if (!branch || branch.status === 'inactive') {
+    return forbidden(res, 'Access denied: Your branch is inactive.');
   }
 
   req.branchId = user.facilityID;

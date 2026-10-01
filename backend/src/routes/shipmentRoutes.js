@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const shipmentController = require('../controllers/shipmentController');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireAdmin } = require('../middleware/auth');
 
-router.use(authenticate);
+router.use(authenticate, requireAdmin);
 
 router.get('/', shipmentController.list);
 router.post('/', shipmentController.create);

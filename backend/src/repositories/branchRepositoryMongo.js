@@ -90,8 +90,12 @@ class BranchRepositoryMongo {
   /**
    * Activate or deactivate a branch.
    */
-  async setStatus(facilityID, status) {
-    const result = await Branch.updateOne({ facilityID }, { status });
+  async setStatus(facilityID, status, session = null) {
+    const result = await Branch.updateOne(
+      { facilityID },
+      { status },
+      session ? { session } : {}
+    );
     return result.matchedCount > 0;
   }
 

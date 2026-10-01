@@ -5,8 +5,8 @@ const { authenticate, requireAdmin } = require('../middleware/auth');
 
 router.use(authenticate);
 
-router.get('/', staffController.list);
-router.get('/:id', staffController.get);
+router.get('/', requireAdmin, staffController.list);
+router.get('/:id', requireAdmin, staffController.get);
 router.post('/', requireAdmin, staffController.create);
 router.patch('/:id/role', requireAdmin, staffController.updateRole);
 router.patch('/:id/status', requireAdmin, staffController.toggleStatus);

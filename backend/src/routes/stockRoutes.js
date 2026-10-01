@@ -21,17 +21,18 @@ router.get('/stores', stockController.getStores);
 router.post('/stores', requireAdmin, stockController.createStore);
 router.put('/stores/:id', requireAdmin, stockController.updateStore);
 router.delete('/stores/:id', requireAdmin, stockController.deleteStore);
-router.get('/purchases/history', stockController.getPurchaseHistory);
-router.get('/purchases/totals', stockController.getPurchaseTotals);
+router.get('/purchases/history', requireAdmin, stockController.getPurchaseHistory);
+router.get('/purchases/totals', requireAdmin, stockController.getPurchaseTotals);
 
 // ─── Branch-scoped routes (authenticate + requireBranchScope) ─────────────
 router.use(requireBranchScope);
 
 router.get('/', stockController.list);
-router.get('/movements', stockController.getMovements);
+router.post('/', requireAdmin, stockController.create);
+router.get('/movements', requireAdmin, stockController.getMovements);
 router.get('/:id', stockController.get);
 router.patch('/:id/price', requireAdminPriceControl, stockController.updatePrice);
 router.patch('/:id/yard-config', requireAdminPriceControl, stockController.updateYardConfig);
-router.post('/receive', stockController.receiveStock);
+router.post('/receive', requireAdmin, stockController.receiveStock);
 
 module.exports = router;

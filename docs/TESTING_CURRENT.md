@@ -16,11 +16,11 @@ The legacy `backend/tests/api.test.js` mutates MySQL and has broad cleanup/reset
 
 ## Current Coverage
 
-The default suite covers URI safety/rejection, Lagos DAS/WAS/MAS date boundaries, branch-scoped aggregation shape, and controller/repository method presence without connecting to MongoDB. API workflows and transactional rollback require the isolated Atlas test database and valid test identities.
+The default suite covers URI safety/rejection, Lagos DAS/WAS/MAS and financial report date boundaries, Admin and branch middleware checks, financial branch/all-business service aggregation contracts, explicit unsupported P&L behavior, stock response cost-field filtering/normalization, archive-not-delete repository behavior, and controller/repository method presence without connecting to MongoDB. API workflows, actual Mongo aggregation results, and transactional rollback require the isolated Atlas test database and valid test identities.
 
 ## Areas Not Fully Automated
 
-Not currently covered by dedicated automated tests: browser print-dialog behavior, all responsive viewports, React component-level date grouping, every historical receipt shape, PHP page rendering, and complete cross-module manual regression. Perform manual checks for these when changing the related feature.
+Not currently covered by dedicated automated tests: authenticated endpoint integration, actual legacy document compatibility against MongoDB, browser print-dialog behavior, all responsive viewports, React component-level date grouping, every historical receipt shape, stock/POS/returns/Goods Requests end-to-end workflows, PHP page rendering, and complete cross-module manual regression. Perform manual checks for these when changing the related feature.
 
 ## Feature Smoke Checks
 

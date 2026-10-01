@@ -1,4 +1,4 @@
-const { Customer, Debt, Deposit } = require('../models');
+const { Customer, Debt, Deposit, Order } = require('../models');
 const { mongoose } = require('../config/mongodb');
 const { reserveLegacyIds } = require('../services/legacyIdService');
 const crypto = require('crypto');
@@ -124,7 +124,58 @@ class CustomerRepositoryMongo {
     if (!mongoose.Types.ObjectId.isValid(customerId)) return [];
     const deposits = await Deposit.find({ customerID: customerId, facilityID })
       .sort({ payment_date: -1 }).limit(Math.min(Number(limit) || 50, 200)).lean();
-    return deposits.map((deposit) => ({ ...deposit, id: deposit._id.toString() }));
+    return deposits.map((deposit) => {
+      const receiptNo = deposit.receipt_number || (deposit.mysqlId ? `DEP-${deposit.mysqlId}` : null);
+      const paymentDate = deposit.payment_date || deposit.createdAt || null;
+      return {
+        ...deposit,
+        id: deposit._id.toString(),
+        receipt_number: receiptNo,
+        transaction_id: receiptNo || deposit._id.toString().slice(-8),
+        deposit_date: paymentDate,
+        payment_date: paymentDate,
+        payment_method: deposit.payment_method || 'Cash',
+        amount: Number(deposit.amount) || 0,
+        description: deposit.description || '',
+        processed_by_name: deposit.processed_by_name || 'Staff',
+      };
+    });
+  }
+
+  async getDebtHistory({ facilityID, customerId, limit = 100 }) {
+    if (!mongoose.Types.ObjectId.isValid(customerId)) return [];
+    const orders = await Order.find({
+      customerID: new mongoose.Types.ObjectId(customerId),
+      facilityID,
+      $or: [
+        { payment: { $regex: /^credit$/i } },
+        { status: { $in: [0, '0'] } },
+      ],
+    })
+      .sort({ creation: -1 })
+      .limit(Math.min(Number(limit) || 100, 500))
+      .lean();
+
+    return orders.map((order) => {
+      const qty = Number(order.quantity) || 0;
+      const subtotal = Number(order.subtotal) || 0;
+      const netTotal = Number(order.net_total) || subtotal;
+      const price = Number(order.price) || (qty > 0 ? (subtotal / qty) : 0);
+      return {
+        id: order._id.toString(),
+        order_id: order.orderID,
+        item: order.productName || order.item || 'Historical item details unavailable',
+        quantity: qty,
+        price,
+        subtotal,
+        net_total: netTotal,
+        discount: Number(order.discount) || 0,
+        amount_paid: Number(order.amount_paid) || 0,
+        staff: order.staff || 'N/A',
+        date: order.creation || null,
+        payment: order.payment || 'Credit',
+      };
+    });
   }
 
   async getDebt(customerID, facilityID) {

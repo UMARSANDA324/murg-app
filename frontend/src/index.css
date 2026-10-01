@@ -8,17 +8,71 @@
   }
 }
 
-/* ─── Thermal POS receipt printing (80mm width) ─────────────────────────── */
+/* ─── Universal & Document Print Styles ──────────────────────────────────────── */
 @media print {
-  body * {
+  /* Neutral default margin & exact color printing */
+  @page {
+    margin: 8mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Universal hide for non-printable navigation and action controls */
+  .print\:hidden,
+  .print-hidden,
+  aside,
+  header {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* When printing from a modal dialog, neutralize modal overlay background */
+  .fixed.inset-0,
+  [role="dialog"] {
+    background: transparent !important;
+    position: static !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+
+  /* If a dedicated printable receipt/manifest modal is active, isolate it */
+  body:has(#thermal-receipt, #deposit-receipt-print, #approval-receipt-print, #collection-receipt-print, #customer-history-print, #shipment-manifest-print) * {
     visibility: hidden;
   }
 
-  /* POS thermal receipt */
-  #thermal-receipt,
-  #thermal-receipt * {
-    visibility: visible;
+  body:has(#thermal-receipt, #deposit-receipt-print, #approval-receipt-print, #collection-receipt-print, #customer-history-print, #shipment-manifest-print)
+    #thermal-receipt,
+  body:has(#thermal-receipt, #deposit-receipt-print, #approval-receipt-print, #collection-receipt-print, #customer-history-print, #shipment-manifest-print)
+    #thermal-receipt *,
+  body:has(#thermal-receipt, #deposit-receipt-print, #approval-receipt-print, #collection-receipt-print, #customer-history-print, #shipment-manifest-print)
+    #deposit-receipt-print,
+  body:has(#thermal-receipt, #deposit-receipt-print, #approval-receipt-print, #collection-receipt-print, #customer-history-print, #shipment-manifest-print)
+    #deposit-receipt-print *,
+  body:has(#thermal-receipt, #deposit-receipt-print, #approval-receipt-print, #collection-receipt-print, #customer-history-print, #shipment-manifest-print)
+    #approval-receipt-print,
+  body:has(#thermal-receipt, #deposit-receipt-print, #approval-receipt-print, #collection-receipt-print, #customer-history-print, #shipment-manifest-print)
+    #approval-receipt-print *,
+  body:has(#thermal-receipt, #deposit-receipt-print, #approval-receipt-print, #collection-receipt-print, #customer-history-print, #shipment-manifest-print)
+    #collection-receipt-print,
+  body:has(#thermal-receipt, #deposit-receipt-print, #approval-receipt-print, #collection-receipt-print, #customer-history-print, #shipment-manifest-print)
+    #collection-receipt-print *,
+  body:has(#thermal-receipt, #deposit-receipt-print, #approval-receipt-print, #collection-receipt-print, #customer-history-print, #shipment-manifest-print)
+    #customer-history-print,
+  body:has(#thermal-receipt, #deposit-receipt-print, #approval-receipt-print, #collection-receipt-print, #customer-history-print, #shipment-manifest-print)
+    #customer-history-print *,
+  body:has(#thermal-receipt, #deposit-receipt-print, #approval-receipt-print, #collection-receipt-print, #customer-history-print, #shipment-manifest-print)
+    #shipment-manifest-print,
+  body:has(#thermal-receipt, #deposit-receipt-print, #approval-receipt-print, #collection-receipt-print, #customer-history-print, #shipment-manifest-print)
+    #shipment-manifest-print * {
+    visibility: visible !important;
   }
+
+  /* POS thermal receipt (80mm width) */
   #thermal-receipt {
     position: absolute;
     left: 0;
@@ -27,13 +81,27 @@
     margin: 0 !important;
     padding: 2mm !important;
     box-shadow: none !important;
+    border: none !important;
+    background: white !important;
+    color: black !important;
   }
 
-  /* Goods approval receipt (A5 / letter) */
-  #approval-receipt-print,
-  #approval-receipt-print * {
-    visibility: visible;
+  /* Deposit payment receipt (A5 / voucher) */
+  #deposit-receipt-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 148mm !important;
+    margin: 0 auto !important;
+    padding: 8mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: white !important;
+    color: black !important;
   }
+
+  /* Goods approval receipt (A5 / voucher) */
   #approval-receipt-print {
     position: absolute;
     left: 0;
@@ -45,13 +113,10 @@
     border: none !important;
     border-radius: 0 !important;
     background: white !important;
+    color: black !important;
   }
 
-  /* Goods collection (final) receipt (A5 / letter) */
-  #collection-receipt-print,
-  #collection-receipt-print * {
-    visibility: visible;
-  }
+  /* Goods collection (final) receipt (A5 / voucher) */
   #collection-receipt-print {
     position: absolute;
     left: 0;
@@ -63,11 +128,69 @@
     border: none !important;
     border-radius: 0 !important;
     background: white !important;
+    color: black !important;
   }
 
-  @page {
-    size: A5;
-    margin: 10mm;
+  /* Customer ledger / debt history print */
+  #customer-history-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 6mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Shipment transfer manifest print */
+  #shipment-manifest-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 6mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Full-page report styles */
+  .report-print,
+  .report-print * {
+    visibility: visible !important;
+  }
+
+  .report-table-wrap {
+    overflow: visible !important;
+  }
+
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
   }
 }
-

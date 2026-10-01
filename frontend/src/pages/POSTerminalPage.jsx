@@ -71,9 +71,6 @@ export default function POSTerminalPage() {
       const res = await api.get(`/stocks/stores?branchId=${activeBranch}`);
       const list = res.data.data || [];
       setStores(list);
-      if (list.length > 0 && !selectedStore) {
-        setSelectedStore(list[0].id);
-      }
     } catch (err) {
       console.error('[POS] Error fetching stores:', err);
     }

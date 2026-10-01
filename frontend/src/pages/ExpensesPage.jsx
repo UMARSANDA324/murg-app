@@ -118,7 +118,7 @@ export default function ExpensesPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this expense?')) return;
+    if (!window.confirm('Archive this expense from the active expense list? The historical financial record will be retained and remain included in financial totals.')) return;
 
     try {
       await api.delete(`/expenses/${id}`);
@@ -299,7 +299,7 @@ export default function ExpensesPage() {
                     onClick={() => handleDelete(expense.id)}
                     className="text-red-600 hover:text-red-900"
                   >
-                    Delete
+                    Archive
                   </button>
                 </td>
               </tr>

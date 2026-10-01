@@ -38,9 +38,9 @@ The root endpoint returns API metadata, version, environment, and database conne
 |---|---|---|
 | GET | `/api/branches` | Authenticated; list is role/branch-aware in repository. |
 | POST | `/api/branches` | Admin; create branch. |
-| GET | `/api/branches/dashboard` | Authenticated branch scope. |
-| GET | `/api/branches/:branchId/dashboard` | Authenticated branch scope. |
-| GET | `/api/branches/:prefix/:suffix/dashboard` | Compatibility form for slash branch codes. |
+| GET | `/api/branches/dashboard` | Admin; resolved branch scope. |
+| GET | `/api/branches/:branchId/dashboard` | Admin; resolved branch scope. |
+| GET | `/api/branches/:prefix/:suffix/dashboard` | Admin; compatibility form for slash branch codes. |
 | GET | `/api/branches/:prefix/:suffix` | Branch lookup for IDs such as `MURG/007`. |
 | PUT | `/api/branches/:prefix/:suffix` | Admin update for slash-form branch IDs. |
 | PATCH | `/api/branches/:prefix/:suffix/status` | Admin status update for slash-form branch IDs. |
@@ -50,47 +50,43 @@ The root endpoint returns API metadata, version, environment, and database conne
 
 ## Staff
 
-`GET /api/staff`, `GET /api/staff/:id` are authenticated and repository-scoped. Admin-only mutations are `POST /api/staff`, `PATCH /api/staff/:id/role`, `PATCH /api/staff/:id/status`, `PATCH /api/staff/:id/email`, `PATCH /api/staff/:id/password`, and `DELETE /api/staff/:id`.
+All `/api/staff` reads and mutations are Admin-only: `GET /api/staff`, `GET /api/staff/:id`, `POST /api/staff`, `PATCH /api/staff/:id/role`, `PATCH /api/staff/:id/status`, `PATCH /api/staff/:id/email`, `PATCH /api/staff/:id/password`, and `DELETE /api/staff/:id`.
 
 ## Stocks and Movements
 
 - `GET /api/stocks`: branch/store/search inventory with case-insensitive partial matching.
 - `GET /api/stocks/catalog`: authenticated global catalog name search used for custom goods requests with case-insensitive partial matching.
 - `GET /api/stocks/stores`: active stores for resolved branch.
-- `GET /api/stocks/movements`: branch-scoped ledger; supports `stockId`, `startDate`, `endDate`, `limit`, `offset`.
+- `GET /api/stocks/movements`: Admin-only branch-scoped ledger; supports `stockId`, `startDate`, `endDate`, `limit`, `offset`.
 - `GET /api/stocks/:id`: one stock record.
-- `POST /api/stocks/receive`: receive supplier stock and create movement.
+- `POST /api/stocks/receive`: Admin-only supplier receipt and movement.
 - `POST /api/stocks/stores`, `PUT /api/stocks/stores/:id`, `DELETE /api/stocks/stores/:id`: Admin-only store management.
-- `GET /api/stocks/purchases/history`, `GET /api/stocks/purchases/totals`: branch-scoped supplier purchase history and totals.
+- `GET /api/stocks/purchases/history`, `GET /api/stocks/purchases/totals`: Admin-only branch-scoped supplier purchase history and totals.
 - `PATCH /api/stocks/:id/price`: Admin-only price update.
 - `PATCH /api/stocks/:id/yard-config`: Admin-only per-yard configuration.
+- `POST /api/stocks`: Admin-only stock creation; validates all numeric/unit fields and records initial quantity in the movement ledger.
+- Buying price and `Bsubtotal` are returned only to Admin; non-Admin catalog responses omit them.
 
 ## Sales and Receipts
 
-- `GET /api/sales`: branch-scoped grouped sales with date/paging parameters.
-- `GET /api/sales/by-date`: compatibility date-range grouped sales endpoint.
+- `GET /api/sales`: Admin-only branch-scoped grouped sales with date/paging parameters.
+- `GET /api/sales/by-date`: Admin-only compatibility date-range grouped sales endpoint.
 - `POST /api/sales/checkout`: authenticated atomic checkout.
-- `GET /api/sales/:orderId/items`: authorized order lines.
+- `GET /api/sales/:orderId/items`: Admin-only order lines.
 - `GET /api/sales/:orderId/receipt`: authorized persistent historical sale/debt receipt.
 
 ## Customers and Debts
 
-- `GET /api/customers`: branch-scoped customers/debt data with case-insensitive name/phone search.
-- `POST /api/customers`: create customer.
-- `GET /api/customers/:id`: retrieve authorized customer.
-- `POST /api/customers/:id/deposits`: record authorized debt deposit.
-- `GET /api/customers/:id/deposits`: retrieve deposit history.
+- `GET /api/customers`: branch-scoped customer list; non-Admin responses omit debt/deposit totals.
+- `POST /api/customers`, `GET /api/customers/:id`, and customer deposit/history routes: Admin-only.
 
 ## Shipments
 
-- `GET /api/shipments`: authorized branch shipments.
-- `POST /api/shipments`: create/dispatch transfer with atomic stock deduction and rollback on failure.
-- `GET /api/shipments/:id`: authorized details with populated branch names and user info.
-- `POST /api/shipments/:id/receive`: receive destination shipment with atomic stock addition and rollback on failure.
+- All shipment routes are Admin-only. Dispatch and receipt retain atomic stock operations and rollback on failure.
 
 ## Expenses and Returns
 
-- Expenses: `GET /api/expenses`, `/totals`, `/dashboard`, `GET /:id`, `POST /`, `PUT /:id`, and `DELETE /:id`; all reads and mutations are scoped to the resolved branch.
+- Expenses: list/read/create/update/archive routes are Admin-only. `DELETE /api/expenses/:id` is a soft archive and writes an audit record transactionally; it does not permanently delete the historical financial record, which remains included in totals.
 - Returns: `GET /api/returns/validate/:orderID` validates order eligibility for return; `POST /api/returns/process` processes return with stock restoration and debt reversal. Returns preserve original order rows and create a separate return ledger record.
 
 ## Goods Requests and Receipts
@@ -109,7 +105,25 @@ The root endpoint returns API metadata, version, environment, and database conne
 
 - Admin management: `GET /api/management/overview`, `GET /api/management/audit-logs` with `limit`, `offset`, `action`, `facilityID` filters.
 - Notifications: `GET /api/notifications` returns notifications scoped to user ID, role, or branch using OR logic; `GET /api/notifications/unread-count` returns unread count using the same OR logic; `PATCH /api/notifications/:id/read` marks single notification as read; `POST /api/notifications/mark-all-read` marks all as read; `POST /api/notifications/mark-read` batch-marks visible notifications as read. All notification operations enforce ownership and use the same recipient/authorization rules.
-- Analytics: `GET /api/analytics/sales-activity` with optional `branchId` and `date`.
+- Analytics: Admin-only. `GET /api/analytics/sales-activity` supports optional `branchId` and `date`.
+- Financial reports: `GET /api/analytics/financial` with `branchId=all|<facilityID>`, `period=week|month|year|custom`, and the applicable `weekStart`, `month`, `year`, `startDate`, and `endDate` parameters. The weekly/monthly/yearly aliases use the same service.
+- Debtor print data: `GET /api/analytics/debtors` supports branch/all-business scope and optional `customerId`.
+- Sales/history and stock ledger print data: `GET /api/analytics/history` supports branch/all-business scope and week/month/year/custom periods. Results are capped and explicitly indicate truncation.
+
+### Financial Reporting Definitions and Limits
+
+- Reports aggregate existing MongoDB order, purchase, expense, debt, stock, and branch records on the backend.
+- The Admin dashboard's daily/weekly financial totals, report API responses, and financial print view all consume this same financial-reporting service. The dashboard does not reuse its separate operational cash/credit widgets as financial source-of-truth totals.
+- Persisted `orders.net_total` is reported once per branch/order as recorded net sales. Orders without it or with conflicting per-line totals are listed in data-quality counts; their line subtotals contribute to gross sales only.
+- Purchase value (`purchase_history.total_cost`) and amount spent (`amount_paid`) are distinct.
+- `expenses.type=in` and `type=out` are reported separately; the application does not establish that both represent expenses.
+- Outstanding customer debt and inventory value are current snapshots, not period activity.
+- Inventory is labelled **Recorded Inventory Buying-Price Value**: active stock quantity × current recorded buying price. It is not total business capital.
+- Profit/loss and COGS are explicitly unavailable until the canonical MURG formula and reliable historic sale-time cost basis are established. Current stock buying prices are not used as historical COGS.
+- Branch and all-business totals use actual branch records/relationships. Unmapped historical order, purchase, expense, debt, and ledger records are reported separately where supported and are not assigned to a branch.
+- Missing/conflicting per-line order `net_total` values are excluded from recorded net sales and counted in data-quality fields. Unknown-branch records are excluded from branch/all-business totals and surfaced separately; debtor and ledger reports expose truncation limits.
+
+Branch archive is Admin-only deactivation: branch documents and historical records are preserved, status changes are audited, and staff branch-scoped operations are denied while the branch is inactive.
 - Realtime: `GET /api/realtime/branch`, authenticated and branch-scoped stream.
 
 ## Shipment Transaction Strategy

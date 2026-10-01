@@ -1,4 +1,6 @@
 const expenseRepo = require('../repositories/expenseRepositoryMongo');
+const { mongoose } = require('../config/mongodb');
+const { recordAuditLog } = require('../services/auditLogService');
 const { success, error, forbidden, notFound } = require('../utils/responseUtils');
 
 class ExpenseController {
@@ -218,13 +220,34 @@ class ExpenseController {
         ? (req.query.branchId || user.facilityID)
         : user.facilityID;
 
-      const deleted = await expenseRepo.deleteExpense(id, facilityID);
+      const expense = await expenseRepo.getExpenseById(id, facilityID);
+      if (!expense) return notFound(res, 'Expense not found');
 
-      if (!deleted) {
-        return notFound(res, 'Expense not found');
+      const session = await mongoose.startSession();
+      let archived = false;
+      try {
+        await session.withTransaction(async () => {
+          archived = await expenseRepo.archiveExpense(id, facilityID, user.id, session);
+          if (!archived) return;
+          await recordAuditLog({
+            facilityID,
+            user_id: user.id,
+            user_name: user.name,
+            action: 'EXPENSE_ARCHIVED',
+            entity_type: 'expenses',
+            entity_id: id,
+            old_values: { item: expense.item, price: expense.price, type: expense.type, date: expense.date },
+            new_values: { isArchived: true },
+            ip_address: req.ip,
+            user_agent: req.get('user-agent'),
+          }, session);
+        });
+      } finally {
+        await session.endSession();
       }
+      if (!archived) return notFound(res, 'Expense not found');
 
-      return success(res, null, 'Expense deleted successfully');
+      return success(res, null, 'Expense archived; the historical financial record is preserved.');
     } catch (err) {
       next(err);
     }

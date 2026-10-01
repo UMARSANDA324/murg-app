@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const goodsRequestController = require('../controllers/goodsRequestController');
-const { authenticate, requireAdmin } = require('../middleware/auth');
+const { authenticate, requireAdmin, requireBranchScope } = require('../middleware/auth');
 
 router.use(authenticate);
+router.use(requireBranchScope);
 
 // ── Staff endpoints ────────────────────────────────────────────────────────────
 // Create a new goods request
@@ -22,12 +23,12 @@ router.get('/receipt/:code', goodsRequestController.lookupByReceiptCode);
 // Security: releasing staff's branch is taken from JWT — client cannot override it
 router.post('/receipt/:code/release', goodsRequestController.releaseGoods);
 
-// View specific request (scoped: own branch only for non-admin)
-router.get('/:id', goodsRequestController.getRequestById);
-
 // ── Admin endpoints ────────────────────────────────────────────────────────────
 // View all goods requests (optionally filtered by status)
 router.get('/', requireAdmin, goodsRequestController.getAllRequests);
+
+// View specific request (scoped: own branch only for non-admin)
+router.get('/:id', goodsRequestController.getRequestById);
 
 // Get eligible source branches for a request
 router.get('/:id/eligible-branches', requireAdmin, goodsRequestController.getEligibleBranches);

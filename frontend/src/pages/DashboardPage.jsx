@@ -4,6 +4,7 @@ import api from '../services/api';
 import { useBranchStore } from '../store/useBranchStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useBranchRealtime } from '../hooks/useBranchRealtime';
+import { getBusinessDate } from '../utils/dateUtils';
 import {
   TrendingUp,
   Package,
@@ -24,6 +25,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [analytics, setAnalytics] = useState(null);
+  const [financialReport, setFinancialReport] = useState(null);
+  const [todayFinancialReport, setTodayFinancialReport] = useState(null);
 
   const fetchDashboard = useCallback(async (showLoading = true) => {
     if (!activeBranch) return;
@@ -44,8 +47,27 @@ export default function DashboardPage() {
     if (activeBranch) {
       fetchDashboard(true);
       fetchAnalytics();
+    if (user?.isGlobalAdmin || user?.role === 'Admin') {
+      const today = getBusinessDate();
+      api.get('/analytics/financial', {
+        params: { branchId: activeBranch, period: 'week' },
+      })
+        .then((res) => setFinancialReport(res.data.data))
+        .catch((err) => {
+          console.error('[Dashboard] Error fetching financial overview:', err);
+          setFinancialReport(null);
+        });
+      api.get('/analytics/financial', {
+        params: { branchId: activeBranch, period: 'custom', startDate: today, endDate: today },
+      })
+        .then((res) => setTodayFinancialReport(res.data.data))
+        .catch((err) => {
+          console.error('[Dashboard] Error fetching daily financial total:', err);
+          setTodayFinancialReport(null);
+        });
     }
-  }, [activeBranch, fetchDashboard]);
+    }
+  }, [activeBranch, fetchDashboard, user]);
 
   const fetchAnalytics = async () => {
     try {
@@ -130,64 +152,37 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Metrics Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* DAS - Daily Active Sales */}
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-semibold uppercase text-slate-500">DAS</span>
-              <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                <BarChart3 className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-xl font-bold text-slate-900">
-              {analytics?.das || 0}
-            </div>
-          </div>
-          <div className="text-[11px] text-slate-500 mt-2">
-            <span>Daily Active Sales</span>
-          </div>
-        </div>
-
-        {/* WAS - Weekly Active Sales */}
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-semibold uppercase text-slate-500">WAS</span>
-              <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
-                <BarChart3 className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-xl font-bold text-slate-900">
-              {analytics?.was || 0}
-            </div>
-          </div>
-          <div className="text-[11px] text-slate-500 mt-2">
-            <span>Weekly Active Sales</span>
-          </div>
-        </div>
-
-        {/* MAS - Monthly Active Sales */}
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-semibold uppercase text-slate-500">MAS</span>
-              <div className="w-7 h-7 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center">
-                <BarChart3 className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-xl font-bold text-slate-900">
-              {analytics?.mas || 0}
-            </div>
-          </div>
-          <div className="text-[11px] text-slate-500 mt-2">
-            <span>Monthly Active Sales</span>
-          </div>
-        </div>
-      </div>
+      {/* DAS/WAS/MAS test metrics removed - these were demo/testing data */}
 
       {/* Original Metrics Cards */}
+      {(user?.isGlobalAdmin || user?.role === 'Admin') && financialReport?.scope.branchId === activeBranch && (
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="m-0 text-sm font-bold text-slate-900">Financial Overview — This Week</h3>
+              <p className="m-0 mt-1 text-xs text-slate-500">
+                {financialReport.scope.label} · {financialReport.period.startDate} to {financialReport.period.endDate}
+              </p>
+            </div>
+            <Link
+              to={`/reports?branchId=${encodeURIComponent(activeBranch)}&period=week`}
+              className="text-xs font-semibold text-indigo-700 hover:underline"
+            >
+              Open reports and print
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <FinancialCard label="Recorded Net Sales" value={financialReport.summary.sales.netSales} />
+            <FinancialCard label="Purchase Value" value={financialReport.summary.purchases.totalPurchaseValue} />
+            <FinancialCard label="Amount Spent on Purchases" value={financialReport.summary.purchases.amountSpent} />
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <div className="text-xs font-semibold text-amber-900">Profit / Loss: Unavailable</div>
+              <div className="mt-1 text-xs text-amber-800">Historical sale-time cost data and a canonical formula are not established.</div>
+            </div>
+          </div>
+        </section>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Today's Sales */}
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between">
@@ -199,14 +194,25 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="text-xl font-bold text-slate-900">
-              ₦{(metrics.today_sales?.net_sales || 0).toLocaleString()}
+              {todayFinancialReport?.scope.branchId === activeBranch
+                ? `₦${Number(todayFinancialReport.summary.sales.netSales).toLocaleString()}`
+                : 'Unavailable'}
             </div>
           </div>
           <div className="text-[11px] text-slate-500 mt-2 space-y-0.5">
-            <div>{metrics.today_sales?.order_count || 0} orders completed</div>
-            <div className="text-[10px] text-slate-400">
-              Cash: ₦{(metrics.today_sales?.cash_sales || 0).toLocaleString()} • Credit: ₦{(metrics.today_sales?.credit_sales || 0).toLocaleString()}
+            <div>
+              {todayFinancialReport?.scope.branchId === activeBranch
+                ? `${todayFinancialReport.summary.sales.orderCount} recorded orders · ${todayFinancialReport.period.startDate}`
+                : 'Financial report unavailable'}
             </div>
+            {(todayFinancialReport?.scope.branchId === activeBranch && (
+              todayFinancialReport.dataQuality.salesWithoutPersistedNetTotal > 0 ||
+              todayFinancialReport.dataQuality.salesWithConflictingPersistedNetTotal > 0
+            )) && (
+              <div className="text-[10px] text-amber-700">
+                {todayFinancialReport.dataQuality.salesWithoutPersistedNetTotal} orders lack persisted net totals; {todayFinancialReport.dataQuality.salesWithConflictingPersistedNetTotal} contain conflicting line totals.
+              </div>
+            )}
           </div>
         </div>
 
@@ -214,7 +220,7 @@ export default function DashboardPage() {
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-semibold uppercase text-slate-500">Stock Inventory</span>
+              <span className="text-[11px] font-semibold uppercase text-slate-500">Recorded Retail-Price Stock Value</span>
               <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
                 <Package className="w-4 h-4" />
               </div>
@@ -379,6 +385,18 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function FinancialCard({ label, value }) {
+  const formatted = Number.isFinite(Number(value))
+    ? new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 2 }).format(Number(value))
+    : 'Unavailable';
+  return (
+    <div className="min-w-0 rounded-lg border border-slate-200 p-3">
+      <div className="text-xs font-medium text-slate-500">{label}</div>
+      <div className="mt-1 break-words text-base font-bold text-slate-900">{formatted}</div>
     </div>
   );
 }

@@ -24,7 +24,7 @@ function expenseDTO(expense) {
  */
 class ExpenseRepositoryMongo {
   async getExpenses({ facilityID, type = null, fromDate = null, toDate = null, limit = 200 } = {}) {
-    const query = { facilityID };
+    const query = { facilityID, isArchived: { $ne: true } };
     if (type) query.type = type;
     const dates = dateFilter(fromDate, toDate);
     if (dates) query.date = dates;
@@ -38,7 +38,7 @@ class ExpenseRepositoryMongo {
 
   async getExpenseById(id, facilityID) {
     if (!mongoose.Types.ObjectId.isValid(id)) return null;
-    const expense = await Expense.findOne({ _id: id, facilityID }).lean();
+    const expense = await Expense.findOne({ _id: id, facilityID, isArchived: { $ne: true } }).lean();
     return expense ? expenseDTO(expense) : null;
   }
 
@@ -59,16 +59,20 @@ class ExpenseRepositoryMongo {
   async updateExpense(id, { facilityID, item, price, type, date = new Date() }) {
     if (!mongoose.Types.ObjectId.isValid(id)) return false;
     const result = await Expense.updateOne(
-      { _id: id, facilityID },
+      { _id: id, facilityID, isArchived: { $ne: true } },
       { item, price, type, date }
     );
     return result.matchedCount > 0;
   }
 
-  async deleteExpense(id, facilityID) {
+  async archiveExpense(id, facilityID, archivedBy, session = null) {
     if (!mongoose.Types.ObjectId.isValid(id)) return false;
-    const result = await Expense.deleteOne({ _id: id, facilityID });
-    return result.deletedCount > 0;
+    const result = await Expense.updateOne(
+      { _id: id, facilityID, isArchived: { $ne: true } },
+      { isArchived: true, archivedAt: new Date(), archivedBy },
+      session ? { session } : {}
+    );
+    return result.modifiedCount > 0;
   }
 
   async getExpenseTotals({ facilityID, fromDate = null, toDate = null } = {}) {
