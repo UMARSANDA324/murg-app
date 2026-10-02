@@ -260,7 +260,7 @@ export default function ExpensesPage() {
       </div>
 
       {/* Expenses Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="min-w-0 overflow-x-auto rounded-lg bg-white shadow print:overflow-visible">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>

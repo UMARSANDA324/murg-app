@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link, Navigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react';
@@ -7,7 +7,7 @@ import PasswordInput from '../components/PasswordInput';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, loading, error, isAuthenticated, authReady } = useAuthStore();
+  const { login, loading, error, authError, isAuthenticated, authReady } = useAuthStore();
   const navigate = useNavigate();
 
   // Redirect to dashboard if already authenticated
@@ -39,6 +39,11 @@ export default function LoginPage() {
           <div className="mb-6 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-sm flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
+          </div>
+        )}
+        {!error && authError && (
+          <div role="alert" className="mb-6 p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-sm">
+            {authError}
           </div>
         )}
 

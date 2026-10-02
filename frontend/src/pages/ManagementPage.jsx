@@ -130,7 +130,7 @@ export default function ManagementPage() {
 
   if (loading && !overview) {
     return (
-      <div className="space-y-6">
+      <div className="w-full min-w-0 space-y-6">
         <div className="bg-white rounded-xl p-6 border border-slate-200 animate-pulse flex items-center justify-between">
           <div className="h-8 bg-slate-200 rounded w-1/3"></div>
           <div className="h-8 bg-slate-200 rounded w-24"></div>
@@ -167,7 +167,7 @@ export default function ManagementPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 space-y-6">
       {/* Top Banner / Header */}
       <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-5 md:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">

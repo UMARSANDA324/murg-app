@@ -168,7 +168,7 @@ export default function ShipmentsPage() {
       </div>
 
       {/* Shipments List */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+      <div className="min-w-0 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs print:overflow-visible">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider">

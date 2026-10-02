@@ -3,6 +3,19 @@ import api from '../services/api';
 
 let restorationPromise = null;
 
+function isValidUser(user) {
+  return typeof user?.id === 'string'
+    && user.id.length > 0
+    && typeof user.role === 'string'
+    && user.role.length > 0;
+}
+
+function clearStoredSession() {
+  localStorage.removeItem('murg_token');
+  localStorage.removeItem('murg_user');
+  localStorage.removeItem('murg_active_branch');
+}
+
 export const useAuthStore = create((set, get) => ({
   token: localStorage.getItem('murg_token') || null,
   user: null,
@@ -20,6 +33,7 @@ export const useAuthStore = create((set, get) => ({
       set({ authError: null });
       const token = localStorage.getItem('murg_token');
       if (!token) {
+        clearStoredSession();
         set({ token: null, user: null, isAuthenticated: false, authReady: true, authError: null });
         return;
       }
@@ -28,38 +42,25 @@ export const useAuthStore = create((set, get) => ({
       try {
         const response = await api.get('/auth/me');
         const user = response.data.data;
+        if (!isValidUser(user)) {
+          throw new Error('Session validation returned an invalid user.');
+        }
+
         localStorage.setItem('murg_user', JSON.stringify(user));
         if (!user.isGlobalAdmin && user.facilityID) {
           localStorage.setItem('murg_active_branch', user.facilityID);
         }
         set({ token, user, isAuthenticated: true, authReady: true, authError: null });
       } catch (err) {
-        const isNetworkFailure = !err.response || err.code === 'ERR_NETWORK' || /ECONNRESET|proxy|network/i.test(err.message || '');
-
-        if (err.response?.status === 401) {
-          localStorage.removeItem('murg_token');
-          localStorage.removeItem('murg_user');
-          set({ token: null, user: null, isAuthenticated: false, authReady: true, authError: null });
-          return;
-        }
-
-        if (isNetworkFailure) {
-          set({
-            token: null,
-            user: null,
-            isAuthenticated: false,
-            authReady: true,
-            authError: null,
-          });
-          return;
-        }
-
+        clearStoredSession();
         set({
-          token,
+          token: null,
           user: null,
           isAuthenticated: false,
           authReady: true,
-          authError: 'Unable to validate your session. Check your connection and retry.',
+          authError: err.response?.status === 401
+            ? 'Your session has expired. Please sign in again.'
+            : 'Your session could not be verified. Please sign in again.',
         });
       }
     })().finally(() => {
@@ -70,10 +71,13 @@ export const useAuthStore = create((set, get) => ({
   },
 
   login: async (email, password) => {
-    set({ loading: true, error: null });
+    set({ loading: true, error: null, authError: null });
     try {
       const response = await api.post('/auth/login', { email, password });
       const { token, user } = response.data.data;
+      if (typeof token !== 'string' || token.trim().length === 0 || !isValidUser(user)) {
+        throw new Error('The server returned an invalid session.');
+      }
 
       localStorage.setItem('murg_token', token);
       localStorage.setItem('murg_user', JSON.stringify(user));
@@ -100,9 +104,7 @@ export const useAuthStore = create((set, get) => ({
   },
 
   logout: () => {
-    localStorage.removeItem('murg_token');
-    localStorage.removeItem('murg_user');
-    localStorage.removeItem('murg_active_branch');
+    clearStoredSession();
     set({
       user: null,
       token: null,

@@ -221,7 +221,7 @@ export default function DashboardLayout() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row print:block">
+    <div className="min-h-screen w-full min-w-0 bg-slate-50 flex flex-col md:flex-row print:block">
       {/* ── Sidebar (Desktop) ────────────────────────────────────────────────── */}
       <aside className="hidden md:flex flex-col w-64 bg-slate-900 text-slate-100 p-4 border-r border-slate-800 shrink-0 print:hidden">
         {/* Brand */}
@@ -272,9 +272,9 @@ export default function DashboardLayout() {
       {/* ── Main Content ──────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Navbar */}
-        <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-xs print:hidden">
+        <header className="min-w-0 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-2 sticky top-0 z-20 shadow-xs print:hidden">
           {/* Mobile hamburger & Brand */}
-          <div className="flex items-center gap-2 md:hidden">
+          <div className="flex shrink-0 items-center gap-2 md:hidden">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 cursor-pointer"
@@ -286,16 +286,16 @@ export default function DashboardLayout() {
           </div>
 
           {/* Branch Selector */}
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-3 md:flex-none">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 hidden sm:inline">
               Branch:
             </span>
             {user?.isGlobalAdmin ? (
-              <div className="relative">
+              <div className="relative min-w-0 max-w-[min(14rem,32vw)] sm:max-w-none">
                 <select
                   value={activeBranch || ''}
                   onChange={(e) => setActiveBranch(e.target.value)}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-900 text-sm font-semibold py-1.5 px-3 pr-8 rounded-md border border-slate-300 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                  className="w-full max-w-full bg-slate-100 hover:bg-slate-200 text-slate-900 text-sm font-semibold py-1.5 px-3 pr-8 rounded-md border border-slate-300 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
                   {branches.map((b) => (
                     <option key={b.facilityID} value={b.facilityID}>
@@ -306,15 +306,15 @@ export default function DashboardLayout() {
                 <ChevronDown className="w-4 h-4 text-slate-500 absolute right-2.5 top-2.5 pointer-events-none" />
               </div>
             ) : (
-              <div className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 font-semibold px-2.5 py-1 rounded-md text-xs border border-indigo-200">
+              <div className="inline-flex min-w-0 max-w-[min(14rem,32vw)] items-center gap-1.5 bg-indigo-50 text-indigo-700 font-semibold px-2.5 py-1 rounded-md text-xs border border-indigo-200 sm:max-w-none">
                 <Building2 className="w-3.5 h-3.5" />
-                <span>{activeBranchData?.name || user?.facilityID}</span>
+                <span className="truncate">{activeBranchData?.name || user?.facilityID}</span>
               </div>
             )}
           </div>
 
           {/* Right: Bell + User */}
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
             {/* ── Notification Bell ──────────────────────────────────────────── */}
             <div className="relative" ref={notifRef}>
               <button
@@ -342,7 +342,7 @@ export default function DashboardLayout() {
               {notifDropdownOpen && (
                 <div
                   id="notification-dropdown"
-                  className="absolute right-0 mt-2 w-[320px] sm:w-[400px] bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden text-xs"
+                  className="fixed left-4 right-4 top-16 z-50 w-auto overflow-hidden rounded-xl border border-slate-200 bg-white text-xs shadow-2xl sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-[400px]"
                   role="dialog"
                   aria-label="Notifications panel"
                 >
@@ -502,7 +502,7 @@ export default function DashboardLayout() {
         )}
 
         {/* Page Content */}
-        <main className="flex-1 p-4 md:p-6 overflow-auto">
+        <main className="min-w-0 flex-1 p-4 md:p-6 overflow-auto">
           <Outlet />
         </main>
       </div>

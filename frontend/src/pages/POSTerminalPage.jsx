@@ -284,12 +284,12 @@ export default function POSTerminalPage() {
         </div>
 
         {/* Product Cards Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {stocks.map((item) => (
             <div
               key={item.id}
               onClick={() => addToCart(item)}
-              className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+              className={`min-w-0 p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
                 item.quantity > 0
                   ? 'bg-white border-slate-200 hover:border-indigo-500 hover:shadow-md'
                   : 'bg-slate-50 border-slate-200 opacity-60 cursor-not-allowed'
@@ -327,9 +327,9 @@ export default function POSTerminalPage() {
       </div>
 
       {/* Right Column: Active Cart & Checkout */}
-      <div className="lg:col-span-5 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col h-[calc(100vh-120px)] sticky top-20">
+      <div className="min-w-0 lg:col-span-5 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col min-h-[360px] lg:h-[calc(100vh-120px)] lg:sticky lg:top-20">
         {/* Cart Header */}
-        <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+        <div className="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <ShoppingCart className="w-5 h-5 text-indigo-600" />
             <h3 className="text-base font-bold text-slate-900 m-0">Active POS Cart</h3>
