@@ -95,7 +95,7 @@ export default function DashboardPage() {
   const branch = data?.branch || {};
 
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         <span className={`inline-flex items-center gap-2 ${realtime.status === 'connected' ? 'text-emerald-700' : 'text-amber-700'}`}>
           <span className={`h-2 w-2 rounded-full ${realtime.status === 'connected' ? 'bg-emerald-500' : 'bg-amber-500'}`} />

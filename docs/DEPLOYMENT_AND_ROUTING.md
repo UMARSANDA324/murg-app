@@ -30,6 +30,20 @@ The Render Static Site rewrites non-file paths to `/index.html`, allowing
 React Router to handle direct navigation and refreshes. This rewrite applies
 only to the frontend service.
 
+## Responsive layout behavior
+
+The shared dashboard layout constrains flex children with `min-w-0`; the mobile
+header lets the branch selector shrink between the hamburger/brand and account
+controls, and the notification panel uses viewport-bounded sizing on phones.
+POS product cards become a single column below the existing `sm` breakpoint,
+and the cart's desktop sticky height is disabled on smaller screens.
+
+Customer, shipment, stock, staff, and expense listing tables scroll within
+their own bounded table wrappers. These wrappers switch to visible overflow
+when printing; the report tables retain their existing print-specific rules.
+Do not apply page-wide `overflow-x: hidden` to mask content that exceeds its
+container.
+
 ## Backend routes and endpoint inventory
 
 `GET /` returns backend service and database status. `GET /api/health` is the
@@ -131,7 +145,7 @@ checks returned JSON 200 for `/` and `/api/health`, 401 for unauthenticated
 `/api/auth/me`, and JSON 404 for an unknown path. MongoDB integration tests
 were not run because `MONGODB_TEST_URI` was unavailable.
 
-## Production test results
+## Historical production test results (2026-09-30)
 
 Live checks on 2026-09-30 observed:
 
@@ -146,15 +160,12 @@ Live checks on 2026-09-30 observed:
 | Browser CORS from frontend origin | Credentialed browser fetch to backend health succeeded with HTTP 200. |
 | Browser CORS from an unrelated origin | Browser blocked the fetch because the allowed-origin response did not match the request origin. |
 
-The confirmed deployed-source causes are that the current GitHub `murg-final`
-revision does not register backend `GET /`, and does not contain `render.yaml`
-or a frontend SPA rewrite. The observed backend health result is no longer
-503; it reports MongoDB connected. No Render deployment logs or environment
-settings were available to this audit, so the cause of the earlier 503 and the
-current build/start commands, deploy branch, and secret-variable presence have
-not been verified from the Render service configuration.
+At the time of this historical check, the deployed-source revision did not
+register backend `GET /` or contain the Render Blueprint. The observations
+below are retained as history and do not describe the current `murg-final`
+source revision.
 
-## Deployment status (2026-09-30)
+## Deployment status recorded on 2026-09-30
 
 The updated code including:
 - Backend root GET / endpoint (backend/src/app.js lines 60-77)
@@ -198,6 +209,74 @@ and `srv-dasina0jo6nc73bv6210` (frontend). These IDs are for reference only;
 do not create duplicate services. Production authentication, valid login, the
 full business API inventory, and a post-deployment route check remain unverified
 until the deployment is completed.
+
+## Current production recheck (2026-10-02)
+
+The implementation commit pushed to `murg-final` is
+`040ef070c51eac50116ad44c0413d5c483068c50`. The tracked root `render.yaml`
+declares the existing `murg-frontend` as a `static` service, with root directory
+`frontend`, publish directory `dist`, and a `/*` rewrite to `/index.html`
+nested under that frontend service. A production Vite build with the configured
+`VITE_API_BASE_URL` produces `frontend/dist/index.html`, JS asset
+`index-Cp-QFVlp.js`, and CSS asset `index-DZls9x5i.css`.
+
+After pushing the commit to the existing deployment branch, both
+`murg-ng.com` and `murg-frontend.onrender.com` served the same current JS/CSS
+asset fingerprints and the JS bundle contained the configured backend API
+origin. This confirms that the live frontend is serving the current build
+artifacts; Render's deployment metadata was not available to confirm the
+deployment's Git SHA itself.
+
+| Production check | Result |
+|---|---|
+| `GET /` on `murg-ng.com` and `murg-frontend.onrender.com` | HTTP 200 HTML; clean browser redirects in React to `/login`, with no `murg_token` and no dashboard content. |
+| Direct `GET /login` | HTTP 404 plain text on both hosts. |
+| Direct `GET /dashboard` | HTTP 404 plain text on both hosts. |
+| Direct `GET /management` | HTTP 404 plain text on both hosts. |
+| `GET /assets/index-Cp-QFVlp.js` | HTTP 200 on production; fingerprint matches the production-configured local build. |
+| `GET /assets/index-DZls9x5i.css` | HTTP 200 on production; fingerprint matches the current local build. |
+| Unauthenticated backend `GET /api/auth/me` | HTTP 401 JSON. |
+| Unauthenticated backend `GET /api/branches` | HTTP 401 JSON. |
+| Backend `GET /api/health` | HTTP 200 JSON. |
+
+The production 404 is now isolated to the active frontend host's routing layer:
+the current built application and assets are present, but the active hosts do
+not apply the SPA fallback. The failure occurs before React Router loads; it is
+not caused by a React route definition, Vite publish output, or backend API
+response. The committed rewrite itself is on the correct frontend service in
+`render.yaml`, but Render dashboard access was unavailable, so whether the
+existing service is linked to that Blueprint or has an equivalent dashboard
+rewrite could not be verified. Repository deployment notes record that these
+services were previously created manually and not linked to the Blueprint.
+Therefore the most likely cause is that the existing service has not applied
+the committed rewrite configuration. Do not create another service or add a
+duplicate rewrite to the application.
+
+The reported anonymous-dashboard bypass was not reproducible in a clean
+production browser: `/` rendered `/login` with no stored token. A direct
+production `/dashboard` request currently returns the host's 404 before the
+client guard can run, so it cannot be counted as a successful protected-route
+redirect test. Local browser checks confirm that anonymous routes, malformed
+or rejected session restoration, and post-logout direct navigation all fail
+closed. Production login with a valid business account was not attempted.
+
+The auth store requires `/api/auth/me` to return a user with a non-empty string
+ID and role before restoring authentication. Missing, malformed, expired,
+rejected, and otherwise unvalidated stored sessions are cleared and remain
+unauthenticated; the login page reports that sign-in is required. Existing
+backend authentication middleware remains in place and returns 401 without a
+token while enforcing account status, roles, and branch scope.
+
+Local browser checks after the responsive changes covered dashboard and
+management cards, POS, customer, shipment, stock, and report pages at phone
+and desktop widths. At 320, 360, 375, 390, 414, 768, 1024, 1280, and 1440 CSS
+pixels, the document scroll width matched its client width, dashboard cards
+were centered, and no header/main element extended past the viewport. Customer,
+shipment, stock, management, and report table scroll areas remained bounded
+inside their own wrappers. The 320px notification panel, mobile navigation,
+and shipment dialog also remained inside the viewport. These are local UI
+checks; production mobile verification remains pending until the Render
+rewrite is active.
 
 ## Troubleshooting
 

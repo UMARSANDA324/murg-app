@@ -359,7 +359,7 @@ export default function StockPage() {
           </div>
 
           {/* Inventory Table */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+          <div className="min-w-0 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs print:overflow-visible">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
@@ -438,7 +438,7 @@ export default function StockPage() {
 
       {/* Stock Movements Ledger Tab */}
       {activeTab === 'movements' && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="min-w-0 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-xs print:overflow-visible">
           {Object.keys(groupMovementsByDate(movements)).length === 0 ? (
             <div className="py-8 text-center text-slate-400 font-sans">
               No movement records logged yet.
