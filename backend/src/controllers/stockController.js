@@ -362,6 +362,53 @@ class StockController {
     }
   }
 
+  /**
+   * GET /api/stocks/:id/tracking
+   * Complete stock lifecycle history — purchases (IN), sales/issues (OUT),
+   * transfers, returns, running balance, and "who bought this item?" buyer audit.
+   * Branch-scoped and admin-only for cost information.
+   */
+  async getStockTracking(req, res, next) {
+    try {
+      const facilityID = req.branchId;
+      const stockId = req.params.id;
+      const {
+        startDate = null,
+        endDate = null,
+        eventType = 'all',
+        customer = null,
+        staff = null,
+        limit: rawLimit = '100',
+        offset: rawOffset = '0',
+      } = req.query;
+
+      const limit = Math.min(Math.max(parseInt(rawLimit) || 100, 1), 500);
+      const offset = Math.max(parseInt(rawOffset) || 0, 0);
+      const includeCost = Boolean(req.user?.isGlobalAdmin || req.user?.role === 'Admin');
+
+      const tracking = await stockRepo.getStockTracking({
+        facilityID,
+        stockId,
+        startDate,
+        endDate,
+        eventType,
+        customer,
+        staff,
+        limit,
+        offset,
+        includeCost,
+      });
+
+      if (!tracking) {
+        return notFound(res, 'Stock item not found or not accessible in this branch');
+      }
+
+      return success(res, tracking);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async getStores(req, res, next) {
     try {
       const user = req.user;
