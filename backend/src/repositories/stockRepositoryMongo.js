@@ -1,4 +1,4 @@
-const { Stock, Store, Branch, Purchase, StockMovement, User, Order } = require('../models');
+const { Stock, Store, Branch, Purchase, StockMovement, User, Order, Return } = require('../models');
 const { mongoose } = require('../config/mongodb');
 const { reserveLegacyIds } = require('../services/legacyIdService');
 
@@ -609,6 +609,390 @@ class StockRepositoryMongo {
     } finally {
       await session.endSession();
     }
+  }
+
+  /**
+   * Complete Stock Tracking — Traceable lifecycle of any stock item.
+   * Unifies Purchases (IN), Orders/Sales (OUT), Stock Movements (Transfers/Adjustments),
+   * and Customer Returns (IN) into a chronological event ledger with running balance,
+   * detailed buyer audit ("Who bought this item?"), staff accountability, and branch/store isolation.
+   */
+  async getStockTracking({
+    facilityID,
+    stockId,
+    startDate = null,
+    endDate = null,
+    eventType = 'all',
+    customer = null,
+    staff = null,
+    limit = 100,
+    offset = 0,
+    includeCost = false,
+  } = {}) {
+    // 1. Resolve stock document strictly within caller's branch
+    let stockQuery = { facilityID };
+    if (mongoose.Types.ObjectId.isValid(stockId)) {
+      stockQuery._id = stockId;
+    } else if (!isNaN(Number(stockId))) {
+      stockQuery.mysqlId = Number(stockId);
+    } else {
+      const escapedId = String(stockId).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      stockQuery.name = new RegExp('^\\s*' + escapedId + '\\s*$', 'i');
+    }
+
+    const stock = await Stock.findOne(stockQuery)
+      .populate('store_id', 'store_name status')
+      .lean();
+
+    if (!stock) return null;
+
+    const storeName = stock.store_id?.store_name || 'Main Warehouse';
+    const escapedName = stock.name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const stockNameRegex = new RegExp('^\\s*' + escapedName + '\\s*$', 'i');
+
+    // 2. Fetch all raw events across authoritative collections
+    const [orders, purchases, movements, returns] = await Promise.all([
+      Order.find({
+        facilityID,
+        $or: [
+          { stockID: stock._id },
+          { item: stockNameRegex },
+          { productName: stockNameRegex },
+        ],
+      })
+        .populate('customerID', 'name phone mysqlId')
+        .lean(),
+      Purchase.find({
+        facilityID,
+        $or: [
+          { stock_id: stock._id },
+          { stock_name: stockNameRegex },
+        ],
+      }).lean(),
+      StockMovement.find({
+        facilityID,
+        stock_id: stock._id,
+      })
+        .populate('performed_by', 'name username role')
+        .lean(),
+      Return.find({
+        facilityID,
+        $or: [
+          { stockID: stock._id },
+          { item: stockNameRegex },
+        ],
+      }).lean(),
+    ]);
+
+    const rawEvents = [];
+    const processedOrderRefs = new Set();
+    const processedPurchaseRefs = new Set();
+
+    // A. StockMovements (Modern application ledger with snapshot fidelity)
+    for (const m of movements) {
+      let customerName = null;
+      let customerId = null;
+      let staffName = m.performed_by?.name || m.performed_by?.username || null;
+      let eventTypeDetected = 'Adjustment';
+      let direction = m.quantity_change >= 0 ? 'IN' : 'OUT';
+      let price = null;
+      let netTotal = null;
+      let payment = null;
+
+      if (m.reference_type === 'orders') {
+        processedOrderRefs.add(String(m.reference_id));
+        const ord = orders.find(o => String(o.orderID) === String(m.reference_id));
+        if (ord) {
+          customerName = ord.customer_name || ord.buyer_name || (ord.customerID?.name || null);
+          customerId = ord.customerID?._id?.toString() || ord.customerID?.toString() || null;
+          staffName = ord.staff || staffName;
+          price = ord.price;
+          netTotal = ord.net_total || ord.subtotal;
+          payment = ord.payment;
+        }
+        eventTypeDetected = 'Sold';
+      } else if (m.reference_type === 'purchase_history') {
+        processedPurchaseRefs.add(String(m.reference_id));
+        eventTypeDetected = 'Received';
+      } else if (m.reference_type === 'shipments' || m.movement_type?.includes('TRANSFER')) {
+        eventTypeDetected = m.quantity_change < 0 ? 'Transferred Out' : 'Transferred In';
+      } else if (m.reference_type === 'returns' || m.movement_type?.includes('RETURN')) {
+        eventTypeDetected = 'Returned';
+      }
+
+      rawEvents.push({
+        id: m._id.toString(),
+        date: new Date(m.createdAt),
+        event_type: eventTypeDetected,
+        direction,
+        quantity: Math.abs(m.quantity_change),
+        quantity_change: m.quantity_change,
+        unit: stock.unit_type || 'belt',
+        reference_type: m.reference_type,
+        reference_id: m.reference_id,
+        customer_name: customerName,
+        customer_id: customerId,
+        staff_name: staffName,
+        branch: facilityID,
+        store_name: storeName,
+        price,
+        total_amount: netTotal,
+        payment_method: payment,
+        quantity_before: m.quantity_before,
+        quantity_after: m.quantity_after,
+        is_movement_snapshot: true,
+        notes: m.notes || null,
+      });
+    }
+
+    // B. Purchases (Stock receiving events)
+    for (const p of purchases) {
+      if (processedPurchaseRefs.has(String(p._id)) || (p.mysqlId && processedPurchaseRefs.has(String(p.mysqlId)))) {
+        continue;
+      }
+      const pDate = p.purchase_date ? new Date(p.purchase_date) : new Date(p.createdAt || Date.now());
+      rawEvents.push({
+        id: p._id.toString(),
+        date: pDate,
+        event_type: 'Received',
+        direction: 'IN',
+        quantity: Number(p.quantity) || 0,
+        quantity_change: Number(p.quantity) || 0,
+        unit: stock.unit_type || 'belt',
+        reference_type: 'purchase',
+        reference_id: p.mysqlId ? `Purchase #${p.mysqlId}` : `PUR-${p._id.toString().slice(-6)}`,
+        supplier_name: p.purchase_from || '—',
+        cost_price: includeCost ? (p.cost_price || 0) : null,
+        total_amount: includeCost ? (p.total_cost || 0) : null,
+        customer_name: null,
+        customer_id: null,
+        staff_name: p.purchaser || null,
+        branch: facilityID,
+        store_name: storeName,
+        payment_method: p.amount_paid >= p.total_cost ? 'Paid' : (p.amount_paid > 0 ? 'Partial' : 'Credit'),
+        details: {
+          supplier: p.purchase_from,
+          cost_price: includeCost ? p.cost_price : null,
+          total_cost: includeCost ? p.total_cost : null,
+          amount_paid: includeCost ? p.amount_paid : null,
+          balance: includeCost ? p.balance : null,
+          description: p.for_desc,
+        },
+      });
+    }
+
+    // C. Orders (Stock sold/issued events)
+    for (const o of orders) {
+      if (processedOrderRefs.has(String(o.orderID))) {
+        continue;
+      }
+      const oDate = o.creation ? new Date(o.creation) : new Date();
+      const cust = o.customer_name || o.buyer_name || (o.customerID?.name || null);
+      rawEvents.push({
+        id: o._id.toString(),
+        date: oDate,
+        event_type: 'Sold',
+        direction: 'OUT',
+        quantity: Number(o.quantity) || 0,
+        quantity_change: -(Number(o.quantity) || 0),
+        unit: stock.unit_type || 'belt',
+        reference_type: 'order',
+        reference_id: o.orderID ? `Order #${o.orderID}` : `ORD-${o._id.toString().slice(-6)}`,
+        customer_name: cust,
+        customer_id: o.customerID?._id?.toString() || o.customerID?.toString() || null,
+        staff_name: o.staff || null,
+        branch: facilityID,
+        store_name: storeName,
+        price: o.price || 0,
+        total_amount: o.net_total || o.subtotal || 0,
+        payment_method: o.payment || '—',
+        details: {
+          orderID: o.orderID,
+          item: o.item,
+          price: o.price,
+          quantity: o.quantity,
+          subtotal: o.subtotal,
+          discount: o.item_discount || o.discount || 0,
+          net_total: o.net_total,
+          payment: o.payment,
+          amount_paid: o.amount_paid,
+          cash: o.cash,
+          pos: o.pos,
+          transfer: o.transfer,
+          bank_name: o.bank_name,
+          buyer_name: o.buyer_name,
+          customer_name: o.customer_name,
+          staff: o.staff,
+        },
+      });
+    }
+
+    // D. Returns (Customer returns)
+    for (const r of returns) {
+      const rDate = r.createdAt ? new Date(r.createdAt) : new Date();
+      rawEvents.push({
+        id: r._id.toString(),
+        date: rDate,
+        event_type: 'Returned',
+        direction: 'IN',
+        quantity: Number(r.quantity) || 0,
+        quantity_change: Number(r.quantity) || 0,
+        unit: stock.unit_type || 'belt',
+        reference_type: 'return',
+        reference_id: r.returnNumber || `RET-${r._id.toString().slice(-6)}`,
+        customer_name: r.customer_name || null,
+        customer_id: null,
+        staff_name: r.processed_by || null,
+        branch: facilityID,
+        store_name: storeName,
+        details: {
+          reason: r.reason,
+          condition: r.condition,
+          orderID: r.orderID,
+        },
+      });
+    }
+
+    // Sort ascending for chronology & running balance
+    rawEvents.sort((a, b) => a.date - b.date);
+
+    // Compute summary totals & running balance
+    let totalReceived = 0;
+    let totalSold = 0;
+    let totalReturned = 0;
+    let totalTransferredOut = 0;
+    let totalTransferredIn = 0;
+
+    const hasOpening = stock.opening_quantity !== null && stock.opening_quantity !== undefined;
+    let runningBalance = hasOpening ? Number(stock.opening_quantity) : 0;
+
+    for (const ev of rawEvents) {
+      if (ev.event_type === 'Received') totalReceived += ev.quantity;
+      else if (ev.event_type === 'Sold') totalSold += ev.quantity;
+      else if (ev.event_type === 'Returned') totalReturned += ev.quantity;
+      else if (ev.event_type === 'Transferred Out') totalTransferredOut += ev.quantity;
+      else if (ev.event_type === 'Transferred In') totalTransferredIn += ev.quantity;
+
+      if (ev.is_movement_snapshot && ev.quantity_after !== undefined) {
+        runningBalance = ev.quantity_after;
+      } else {
+        runningBalance += ev.quantity_change;
+      }
+      ev.balance = runningBalance;
+    }
+
+    // Build Buyers List ("Who bought this item?")
+    const buyersMap = new Map();
+    for (const ev of rawEvents) {
+      if (ev.event_type === 'Sold') {
+        const bKey = ev.customer_name ? ev.customer_name.trim() : 'Customer information unavailable';
+        const bEntry = buyersMap.get(bKey) || {
+          customer_name: bKey,
+          customer_id: ev.customer_id || null,
+          total_quantity: 0,
+          orders_count: 0,
+          total_spent: 0,
+          payment_methods: new Set(),
+          first_purchase_date: ev.date,
+          last_purchase_date: ev.date,
+        };
+        bEntry.total_quantity += ev.quantity;
+        bEntry.orders_count += 1;
+        bEntry.total_spent += ev.total_amount || 0;
+        if (ev.payment_method && ev.payment_method !== '—') bEntry.payment_methods.add(ev.payment_method);
+        if (ev.date < bEntry.first_purchase_date) bEntry.first_purchase_date = ev.date;
+        if (ev.date > bEntry.last_purchase_date) bEntry.last_purchase_date = ev.date;
+        buyersMap.set(bKey, bEntry);
+      }
+    }
+
+    const buyersList = Array.from(buyersMap.values())
+      .map(b => ({
+        ...b,
+        payment_methods: Array.from(b.payment_methods),
+      }))
+      .sort((a, b) => b.total_quantity - a.total_quantity);
+
+    // Apply search filters
+    let filtered = rawEvents;
+
+    if (startDate) {
+      const sDate = new Date(startDate);
+      if (!isNaN(sDate.getTime())) {
+        filtered = filtered.filter(e => e.date >= sDate);
+      }
+    }
+    if (endDate) {
+      const eDate = new Date(endDate);
+      if (!isNaN(eDate.getTime())) {
+        eDate.setHours(23, 59, 59, 999);
+        filtered = filtered.filter(e => e.date <= eDate);
+      }
+    }
+    if (eventType && eventType !== 'all') {
+      const norm = eventType.toLowerCase();
+      filtered = filtered.filter(e => e.event_type.toLowerCase().includes(norm));
+    }
+    if (customer && customer.trim()) {
+      const cNorm = customer.trim().toLowerCase();
+      filtered = filtered.filter(e =>
+        (e.customer_name && e.customer_name.toLowerCase().includes(cNorm)) ||
+        (e.supplier_name && e.supplier_name.toLowerCase().includes(cNorm))
+      );
+    }
+    if (staff && staff.trim()) {
+      const sNorm = staff.trim().toLowerCase();
+      filtered = filtered.filter(e => e.staff_name && e.staff_name.toLowerCase().includes(sNorm));
+    }
+
+    // Sort descending for display (newest events first)
+    const displayEvents = [...filtered].sort((a, b) => b.date - a.date);
+
+    const totalEventsCount = displayEvents.length;
+    const paginatedEvents = displayEvents.slice(offset, offset + limit);
+
+    return {
+      stock: {
+        _id: stock._id.toString(),
+        mysqlId: stock.mysqlId || null,
+        name: stock.name,
+        code: stock.mysqlId ? `STK-${String(stock.mysqlId).padStart(4, '0')}` : `STK-${stock._id.toString().slice(-6).toUpperCase()}`,
+        current_quantity: stock.quantity,
+        unit_type: stock.unit_type || 'belt',
+        yards_per_belt: stock.yards_per_belt || 100,
+        price_per_yard: stock.price_per_yard || null,
+        selling: stock.selling || 0,
+        buying: includeCost ? (stock.buying || 0) : null,
+        facilityID: stock.facilityID,
+        store: {
+          _id: stock.store_id?._id?.toString() || stock.store_id?.toString() || null,
+          name: storeName,
+        },
+        status: stock.status || 'active',
+      },
+      summary: {
+        total_received: totalReceived,
+        total_sold: totalSold,
+        total_returned: totalReturned,
+        total_transferred_out: totalTransferredOut,
+        total_transferred_in: totalTransferredIn,
+        current_balance: stock.quantity,
+        calculated_balance: runningBalance,
+        opening_balance: hasOpening ? Number(stock.opening_quantity) : null,
+        is_balance_exact: runningBalance === stock.quantity,
+        transaction_count: rawEvents.length,
+        filtered_count: totalEventsCount,
+        unique_buyers_count: buyersList.filter(b => b.customer_name !== 'Customer information unavailable').length,
+      },
+      buyers: buyersList,
+      events: paginatedEvents,
+      pagination: {
+        total: totalEventsCount,
+        limit,
+        offset,
+        hasMore: offset + limit < totalEventsCount,
+      },
+    };
   }
 }
 

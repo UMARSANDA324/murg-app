@@ -9,7 +9,7 @@ const { Order } = require('../../src/models');
 const repositoryContracts = [
   ['branch', require('../../src/repositories/branchRepositoryMongo'), ['findAll', 'findByFacilityID', 'create', 'update', 'setStatus', 'getDashboardMetrics']],
   ['staff', require('../../src/repositories/staffRepositoryMongo'), ['findAll', 'findById', 'create', 'updateRole', 'setStatus', 'emailExists', 'delete', 'updateEmail', 'updatePassword']],
-  ['stock', require('../../src/repositories/stockRepositoryMongo'), ['findAll', 'findById', 'updatePrice', 'updateYardConfig', 'receiveStock', 'getMovements', 'getStores', 'createStore', 'updateStore', 'deleteStore', 'getPurchaseHistory', 'getPurchaseTotals', 'globalCatalogSearch']],
+  ['stock', require('../../src/repositories/stockRepositoryMongo'), ['findAll', 'findById', 'updatePrice', 'updateYardConfig', 'receiveStock', 'getMovements', 'getStores', 'createStore', 'updateStore', 'deleteStore', 'getPurchaseHistory', 'getPurchaseTotals', 'globalCatalogSearch', 'getStockTracking']],
   ['goods request', require('../../src/repositories/goodsRequestRepositoryMongo'), ['createRequest', 'findByStaff', 'findAll', 'findById', 'findApprovedForBranch', 'findByReceiptCode', 'validateReceiptForRelease', 'getEligibleBranchesForProduct', 'getEligibleBranchesByName', 'rejectRequest', 'approveRequest', 'releaseGoods', 'approveAndShipRequest']],
   ['shipment', require('../../src/repositories/shipmentRepositoryMongo'), ['findAll', 'findById', 'createAndDispatch', 'confirmReceipt']],
   ['shipment receipt', require('../../src/repositories/shipmentReceiptRepository'), ['findByReceiptCode', 'verifyAndReleaseReceipt']],

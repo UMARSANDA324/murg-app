@@ -30,6 +30,7 @@ router.use(requireBranchScope);
 router.get('/', stockController.list);
 router.post('/', requireAdmin, stockController.create);
 router.get('/movements', requireAdmin, stockController.getMovements);
+router.get('/:id/tracking', stockController.getStockTracking);
 router.get('/:id', stockController.get);
 router.patch('/:id/price', requireAdminPriceControl, stockController.updatePrice);
 router.patch('/:id/yard-config', requireAdminPriceControl, stockController.updateYardConfig);
