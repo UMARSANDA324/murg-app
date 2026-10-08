@@ -12,5 +12,8 @@ router.get('/:id', requireAdmin, customerController.get);
 router.post('/:id/deposits', requireAdmin, customerController.recordDeposit);
 router.get('/:id/deposits', requireAdmin, customerController.getDeposits);
 router.get('/:id/debt-history', requireAdmin, customerController.getDebtHistory);
+router.post('/:id/collect-change', requireAdmin, customerController.collectChange);
+router.get('/:id/credit', requireAdmin, customerController.getCredit);
+router.get('/:id/credit-history', requireAdmin, customerController.getCreditHistory);
 
 module.exports = router;

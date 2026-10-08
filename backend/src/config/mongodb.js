@@ -12,6 +12,7 @@ const MONGODB_URI = process.env.MONGODB_URI;
 const mongoOptions = {
   serverSelectionTimeoutMS: 30000,
   socketTimeoutMS: 45000,
+  dbName: process.env.DB_NAME || 'murg',
 };
 
 const connectDB = async () => {

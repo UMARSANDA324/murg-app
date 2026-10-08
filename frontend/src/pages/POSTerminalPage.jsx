@@ -51,6 +51,7 @@ export default function POSTerminalPage() {
   const [posAmount, setPosAmount] = useState('');
   const [transferAmount, setTransferAmount] = useState('');
   const [bankName, setBankName] = useState('');
+  const [creditUsed, setCreditUsed] = useState('');
 
   // Receipt modal state
   const [receiptData, setReceiptData] = useState(null);
@@ -171,14 +172,22 @@ export default function POSTerminalPage() {
     setCart(cart.filter((item) => item.stockId !== stockId));
   };
 
+  // Selected customer info
+  const selectedCustomer = customers.find(c => String(c.id) === String(selectedCustomerId));
+  const availableCustomerCredit = selectedCustomer ? Math.max(0, Number(selectedCustomer.credit_balance) || 0) : 0;
+
   // Totals calculation
   const grossTotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const totalItemDiscounts = cart.reduce((acc, item) => acc + (parseFloat(item.itemDiscount) || 0) * item.quantity, 0);
   const netTotal = Math.max(0, grossTotal - totalItemDiscounts - (parseFloat(globalDiscount) || 0));
 
+  const requestedCreditUsed = parseFloat(creditUsed) || 0;
+  const appliedCredit = Math.min(availableCustomerCredit, Math.min(netTotal, requestedCreditUsed));
+  const payableAfterCredit = Math.max(0, netTotal - appliedCredit);
+
   const totalPaid = (parseFloat(cashAmount) || 0) + (parseFloat(posAmount) || 0) + (parseFloat(transferAmount) || 0);
-  const changeDue = Math.max(0, totalPaid - netTotal);
-  const creditBalance = isCredit ? Math.max(0, netTotal - totalPaid) : 0;
+  const changeDue = Math.max(0, totalPaid - payableAfterCredit);
+  const creditBalance = isCredit ? Math.max(0, payableAfterCredit - totalPaid) : 0;
 
   const handleCheckout = async () => {
     if (cart.length === 0) {
@@ -186,8 +195,8 @@ export default function POSTerminalPage() {
       return;
     }
 
-    if (!isCredit && totalPaid < netTotal) {
-      alert(`Total payment (₦${totalPaid.toLocaleString()}) is less than net payable (₦${netTotal.toLocaleString()}). For credit sales, enable the Credit Sale option.`);
+    if (!isCredit && (totalPaid + appliedCredit) < netTotal) {
+      alert(`Total payment + change credit (₦${(totalPaid + appliedCredit).toLocaleString()}) is less than net payable (₦${netTotal.toLocaleString()}). For credit sales, enable the Credit Sale option.`);
       return;
     }
 
@@ -195,7 +204,6 @@ export default function POSTerminalPage() {
     setErrorMsg(null);
 
     try {
-      const selectedCustomer = customers.find(c => String(c.id) === String(selectedCustomerId));
       const payload = {
         branchId: activeBranch,
         buyerName: buyerName || (selectedCustomer ? selectedCustomer.name : 'Retail Customer'),
@@ -214,6 +222,7 @@ export default function POSTerminalPage() {
           transfer: parseFloat(transferAmount) || 0,
           bankName: bankName || null,
         },
+        creditUsed: appliedCredit,
         isCredit: Boolean(isCredit),
       };
 
@@ -231,13 +240,15 @@ export default function POSTerminalPage() {
       setPosAmount('');
       setTransferAmount('');
       setBankName('');
+      setCreditUsed('');
       setGlobalDiscount(0);
       setBuyerName('');
       setIsCredit(false);
       setSelectedCustomerId('');
 
-      // Refresh stock balance
+      // Refresh stock balance and customers
       fetchStocks();
+      fetchCustomers();
     } catch (err) {
       const msg = err.response?.data?.message || 'Checkout failed. Please try again.';
       setErrorMsg(msg);
@@ -372,38 +383,94 @@ export default function POSTerminalPage() {
             </div>
           </div>
 
-          {isCredit ? (
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-amber-800 uppercase block">Registered Customer (Debt Tracking) *</label>
-              <select
-                value={selectedCustomerId}
-                onChange={(e) => {
-                  setSelectedCustomerId(e.target.value);
-                  const cust = customers.find(c => String(c.id) === String(e.target.value));
-                  if (cust) setBuyerName(cust.name);
-                }}
-                className="w-full bg-white border border-amber-300 rounded-lg py-1.5 px-2 text-xs font-medium focus:ring-1 focus:ring-amber-500"
-              >
-                <option value="">-- Choose Debtor / Customer --</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.phone ? `(${c.phone})` : ''}
-                  </option>
-                ))}
-              </select>
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center">
+              <label className="text-[10px] font-bold text-slate-700 uppercase block">
+                {isCredit ? 'Registered Debtor / Customer *' : 'Select Customer (Optional for change credit)'}
+              </label>
             </div>
-          ) : (
-            <div className="relative">
-              <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Walk-in Buyer Name (Optional)"
-                value={buyerName}
-                onChange={(e) => setBuyerName(e.target.value)}
-                className="w-full bg-white border border-slate-300 rounded-lg py-1.5 pl-9 pr-3 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
-              />
-            </div>
-          )}
+            <select
+              value={selectedCustomerId}
+              onChange={(e) => {
+                const cId = e.target.value;
+                setSelectedCustomerId(cId);
+                const cust = customers.find(c => String(c.id) === String(cId));
+                if (cust) {
+                  setBuyerName(cust.name);
+                  if ((cust.credit_balance || 0) > 0) {
+                    setCreditUsed(String(Math.min(cust.credit_balance, netTotal)));
+                  } else {
+                    setCreditUsed('');
+                  }
+                } else {
+                  setCreditUsed('');
+                }
+              }}
+              className={`w-full bg-white border rounded-lg py-1.5 px-2 text-xs font-medium focus:ring-1 ${
+                isCredit ? 'border-amber-300 focus:ring-amber-500' : 'border-slate-300 focus:ring-indigo-500'
+              }`}
+            >
+              <option value="">-- {isCredit ? 'Choose Registered Customer *' : 'Walk-in / Select Customer'} --</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} {c.phone ? `(${c.phone})` : ''} {c.credit_balance > 0 ? `[Change: ₦${c.credit_balance.toLocaleString()}]` : ''}
+                </option>
+              ))}
+            </select>
+
+            {!selectedCustomerId && !isCredit && (
+              <div className="relative mt-1">
+                <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Walk-in Buyer Name (Optional)"
+                  value={buyerName}
+                  onChange={(e) => setBuyerName(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-lg py-1.5 pl-9 pr-3 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+            )}
+
+            {selectedCustomer && availableCustomerCredit > 0 && (
+              <div className="p-2.5 bg-emerald-50 border border-emerald-300 rounded-lg text-xs space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-emerald-900 flex items-center gap-1">
+                    <Banknote className="w-3.5 h-3.5 text-emerald-700" /> Available Change Credit:
+                  </span>
+                  <span className="font-mono font-black text-emerald-800">
+                    ₦{availableCustomerCredit.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max={Math.min(availableCustomerCredit, netTotal)}
+                    placeholder="Apply change (₦)"
+                    value={creditUsed}
+                    onChange={(e) => setCreditUsed(e.target.value)}
+                    className="flex-1 bg-white border border-emerald-400 rounded px-2 py-1 text-xs font-bold text-slate-900"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setCreditUsed(String(Math.min(availableCustomerCredit, netTotal)))}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] px-2 py-1 rounded cursor-pointer"
+                  >
+                    Apply Max
+                  </button>
+                  {appliedCredit > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setCreditUsed('')}
+                      className="text-slate-500 hover:text-slate-700 text-[10px] underline cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Cart Items List */}
@@ -482,9 +549,24 @@ export default function POSTerminalPage() {
               <span>Net Payable:</span>
               <span className="text-indigo-600">₦{netTotal.toLocaleString()}</span>
             </div>
+
+            {appliedCredit > 0 && (
+              <div className="flex justify-between text-xs font-bold text-emerald-700 bg-emerald-50 p-1.5 rounded border border-emerald-200">
+                <span>Customer Change Applied:</span>
+                <span>-₦{appliedCredit.toLocaleString()}</span>
+              </div>
+            )}
+
+            {appliedCredit > 0 && (
+              <div className="flex justify-between text-xs font-bold text-slate-800 pt-0.5">
+                <span>Remaining Cash/Tender Due:</span>
+                <span>₦{payableAfterCredit.toLocaleString()}</span>
+              </div>
+            )}
+
             {isCredit && (
               <div className="flex justify-between text-xs font-bold text-amber-700 pt-0.5">
-                <span>Credit / Debt Balance:</span>
+                <span>Credit / Debt Added:</span>
                 <span>₦{creditBalance.toLocaleString()}</span>
               </div>
             )}
@@ -538,7 +620,7 @@ export default function POSTerminalPage() {
             )}
             <div className="flex justify-between text-xs pt-1">
               <span className="text-slate-500">Total Tendered: ₦{totalPaid.toLocaleString()}</span>
-              <span className="font-bold text-emerald-700">Change: ₦{changeDue.toLocaleString()}</span>
+              <span className="font-bold text-emerald-700">Change Due: ₦{changeDue.toLocaleString()}</span>
             </div>
           </div>
 
@@ -555,7 +637,7 @@ export default function POSTerminalPage() {
             className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-lg text-sm transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
           >
             <CheckCircle2 className="w-4 h-4" />
-            <span>{loading ? 'Processing Sale...' : `Complete Sale (₦${netTotal.toLocaleString()})`}</span>
+            <span>{loading ? 'Processing Sale...' : `Complete Sale (₦${payableAfterCredit.toLocaleString()})`}</span>
           </button>
         </div>
       </div>
@@ -623,17 +705,60 @@ export default function POSTerminalPage() {
 
               {/* Totals */}
               <div className="space-y-1 text-[11px] pb-3 border-b border-dashed border-slate-400">
+                <div className="flex justify-between text-slate-700">
+                  <span>Net Payable:</span>
+                  <span className="font-bold">₦{receiptData.order.net_total.toLocaleString()}</span>
+                </div>
                 {receiptData.order.discount > 0 && (
                   <div className="flex justify-between text-slate-600">
                     <span>Discount:</span>
                     <span>-₦{receiptData.order.discount.toLocaleString()}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-black text-xs pt-1">
-                  <span>TOTAL PAID:</span>
+                {receiptData.order.credit_applied > 0 && (
+                  <div className="flex justify-between text-emerald-800 font-semibold bg-emerald-50/70 px-1 py-0.5 rounded">
+                    <span>Change Credit Applied:</span>
+                    <span>-₦{receiptData.order.credit_applied.toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-black text-xs pt-1 border-t border-slate-200">
+                  <span>CASH/CARD PAID:</span>
                   <span>₦{receiptData.order.amount_paid.toLocaleString()}</span>
                 </div>
+
+                {/* Customer Change Balance Box */}
+                {receiptData.order.credit_applied > 0 && (
+                  <div className="mt-1.5 pt-1.5 border-t border-dashed border-slate-300 text-[10px] text-slate-600 space-y-0.5">
+                    <div className="flex justify-between">
+                      <span>Change Credit Before:</span>
+                      <span>₦{(receiptData.order.customer_credit_before || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-emerald-800">
+                      <span>Change Credit Remaining:</span>
+                      <span>₦{(receiptData.order.customer_credit_after || 0).toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Credit Ledger Section */}
+                {(receiptData.order.is_credit || receiptData.order.new_credit > 0 || receiptData.order.debt_amount > 0) && (
+                  <div className="mt-2 pt-2 border-t border-dashed border-slate-400 bg-amber-50/70 p-2 rounded text-[10px] space-y-1">
+                    <div className="flex justify-between text-slate-600">
+                      <span>Outstanding Debt Before:</span>
+                      <span className="font-mono font-semibold">₦{(receiptData.order.outstanding_before || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-amber-900 font-bold">
+                      <span>New Debt Added:</span>
+                      <span className="font-mono font-bold">+₦{(receiptData.order.new_credit || receiptData.order.debt_amount || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-900 font-black pt-1 border-t border-amber-200 text-[11px]">
+                      <span>Outstanding Debt After:</span>
+                      <span className="font-mono font-black">₦{(receiptData.order.outstanding_after || (receiptData.order.outstanding_before || 0) + (receiptData.order.new_credit || 0)).toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
               </div>
+
 
               {/* Payment methods */}
               <div className="pt-2 text-[10px] text-slate-600 space-y-0.5">

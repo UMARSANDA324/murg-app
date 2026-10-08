@@ -97,6 +97,66 @@ class CustomerController {
     }
   }
 
+  async collectChange(req, res, next) {
+    try {
+      const facilityID = req.branchId;
+      const customerId = req.params.id;
+      const { amount, paymentMethod, notes } = req.body;
+
+      if (!amount || parseFloat(amount) <= 0) {
+        return error(res, 'Collection amount must be greater than zero', 400);
+      }
+
+      const result = await customerRepo.collectChange({
+        facilityID,
+        customerId,
+        amount: parseFloat(amount),
+        paymentMethod: paymentMethod || 'Cash',
+        notes: notes ? notes.trim() : '',
+        processedByName: req.user.name,
+        staffID: req.user.id,
+      });
+
+      publishBranchEvent({
+        branchIds: [facilityID],
+        type: 'branch-operation',
+        operation: 'CUSTOMER_CHANGE_COLLECTED',
+        referenceId: result.transactionId,
+      });
+
+      return created(res, result, 'Customer change collected successfully');
+    } catch (err) {
+      if (err.message.includes('Insufficient customer credit') || err.message.includes('greater than zero')) {
+        return error(res, err.message, 400);
+      }
+      next(err);
+    }
+  }
+
+  async getCredit(req, res, next) {
+    try {
+      const facilityID = req.branchId;
+      const customerId = req.params.id;
+      const credit = await customerRepo.getCustomerCredit(customerId, facilityID);
+      return success(res, credit || { balance: 0, total_credited: 0, total_collected: 0, total_used_goods: 0 });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getCreditHistory(req, res, next) {
+    try {
+      const facilityID = req.branchId;
+      const customerId = req.params.id;
+      const limit = req.query.limit ? parseInt(req.query.limit) : 50;
+
+      const history = await customerRepo.getCreditHistory({ facilityID, customerId, limit });
+      return success(res, history);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async getDeposits(req, res, next) {
     try {
       const facilityID = req.branchId;

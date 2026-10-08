@@ -16,6 +16,14 @@ const depositSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  previous_balance: {
+    type: Number,
+    default: 0,
+  },
+  new_balance: {
+    type: Number,
+    default: 0,
+  },
   payment_date: Date,
   receipt_number: String,
   payment_method: String,

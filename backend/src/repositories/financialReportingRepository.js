@@ -355,11 +355,13 @@ class FinancialReportingRepository {
           },
         },
       ]),
+      // Get ALL credit orders for the facility, not just for customers with positive debt
+      // This ensures complete credit sale history regardless of current debt balance
       Order.aggregate([
         {
           $match: {
             facilityID: { $in: facilityIDs },
-            customerID: { $in: customerIds },
+            customerID: { $exists: true, $ne: null },
             $or: [
               { payment: { $regex: /^credit$/i } },
               { status: { $in: [0, '0'] } },
@@ -398,7 +400,23 @@ class FinancialReportingRepository {
     const depositsByKey = new Map(deposits.map((item) => [`${item._id.facilityID}:${item._id.customerID}`, item]));
     const ordersByKey = new Map(creditOrders.map((item) => [`${item._id.facilityID}:${item._id.customerID}`, item]));
 
-    const items = debts.map((debt) => {
+    // Build debt map for quick lookup
+    const debtByCustomer = new Map(debts.map((debt) => [String(debt.customerID), debt]));
+
+    // Get all unique customer IDs from credit orders (not just debts)
+    const allCustomerIdsFromOrders = [...new Set(creditOrders.map((item) => String(item._id.customerID)))];
+
+    // Fetch customer details for customers with credit orders but no positive debt
+    const missingCustomerIds = allCustomerIdsFromOrders.filter(cid => !customerById.has(cid));
+    if (missingCustomerIds.length > 0) {
+      const missingCustomers = await Customer.find({ _id: { $in: missingCustomerIds } })
+        .select('name phone email facilityID')
+        .lean();
+      missingCustomers.forEach(customer => customerById.set(String(customer._id), customer));
+    }
+
+    // Build items for customers with positive debt (current debtors)
+    const debtItems = debts.map((debt) => {
       const customer = customerById.get(String(debt.customerID));
       const key = `${debt.facilityID}:${debt.customerID}`;
       const depositHistory = depositsByKey.get(key)?.entries || [];
@@ -418,10 +436,41 @@ class FinancialReportingRepository {
         paymentHistoryTotal: numeric(depositsByKey.get(key)?.entryCount),
       };
     });
+
+    // Build items for customers with credit orders but no positive debt (historical credit customers)
+    const historicalCreditItems = allCustomerIdsFromOrders
+      .filter(cid => !debtByCustomer.has(cid) || debtByCustomer.get(cid).balance <= 0)
+      .map((customerId) => {
+        const customer = customerById.get(customerId);
+        const creditOrderData = creditOrders.find(item => String(item._id.customerID) === customerId);
+        const facilityID = creditOrderData?._id.facilityID;
+        const key = `${facilityID}:${customerId}`;
+        const depositHistory = depositsByKey.get(key)?.entries || [];
+        const debt = debtByCustomer.get(customerId);
+
+        return {
+          customerId: customerId,
+          customerName: customer?.name || 'Unknown customer',
+          phone: customer?.phone || null,
+          email: customer?.email || null,
+          branchId: facilityID || null,
+          balance: debt ? numeric(debt.balance) : 0,
+          lastPayment: debt ? numeric(debt.last_payment) : 0,
+          lastPaymentDate: debt?.last_payment_date || null,
+          depositTotal: numeric(depositsByKey.get(key)?.totalDeposits),
+          debtHistory: ordersByKey.get(key)?.orders || [],
+          paymentHistory: depositHistory,
+          debtHistoryTotal: numeric(ordersByKey.get(key)?.orderCount),
+          paymentHistoryTotal: numeric(depositsByKey.get(key)?.entryCount),
+        };
+      });
+
+    // Combine both sets, prioritizing current debtors first
+    const items = [...debtItems, ...historicalCreditItems];
     return {
       items,
-      totalCount: numeric(totals[0]?.count),
-      totalBalance: numeric(totals[0]?.totalBalance),
+      totalCount: items.length, // Total customers with credit history (both current debtors and historical)
+      totalBalance: numeric(totals[0]?.totalBalance), // Only outstanding balance from current debtors
       unmapped: {
         debtorCount: numeric(unmappedTotals[0]?.count),
         outstandingBalance: numeric(unmappedTotals[0]?.balance),
