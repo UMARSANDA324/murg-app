@@ -70,6 +70,7 @@ class SalesController {
         globalDiscount = 0,
         payment = { cash: 0, pos: 0, transfer: 0, bankName: null },
         isCredit = false,
+        creditUsed = 0,
       } = req.body;
 
       if (!items || !Array.isArray(items) || items.length === 0) {
@@ -100,6 +101,7 @@ class SalesController {
           bankName: payment.bankName || null,
         },
         isCredit: Boolean(isCredit),
+        creditUsed: parseFloat(creditUsed) || 0,
       });
 
       publishBranchEvent({

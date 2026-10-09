@@ -22,6 +22,8 @@ const ShipmentReceipt = require('./ShipmentReceipt');
 const AuditLog = require('./AuditLog');
 const Counter = require('./Counter');
 const Return = require('./Return');
+const CustomerCredit = require('./CustomerCredit');
+const CustomerCreditTransaction = require('./CustomerCreditTransaction');
 
 module.exports = {
   User,
@@ -43,4 +45,6 @@ module.exports = {
   AuditLog,
   Counter,
   Return,
+  CustomerCredit,
+  CustomerCreditTransaction,
 };

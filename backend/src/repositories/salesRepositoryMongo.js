@@ -1,4 +1,4 @@
-const { Order, Stock, Branch, Customer, Debt, StockMovement, Store } = require('../models');
+const { Order, Stock, Branch, Customer, Debt, StockMovement, Store, CustomerCredit, CustomerCreditTransaction } = require('../models');
 const { mongoose } = require('../config/mongodb');
 const { reserveLegacyIds } = require('../services/legacyIdService');
 
@@ -90,10 +90,35 @@ class SalesRepositoryMongo {
 
     const branch = await Branch.findOne({ facilityID: items[0].facilityID }).lean();
 
-    const isCredit = items[0].payment === 'credit' || items[0].status === 0;
+    const creditTx = await CustomerCreditTransaction.findOne({
+      $or: [{ reference_id: orderID }, { receipt_number: orderID }],
+    }).lean();
+
+    const creditApplied = creditTx
+      ? Number(creditTx.amount) || 0
+      : parseFloat(items[0].credit_applied) || 0;
+    const customerCreditBefore = creditTx
+      ? Number(creditTx.previous_balance) || 0
+      : parseFloat(items[0].customer_credit_before) || 0;
+    const customerCreditAfter = creditTx
+      ? Number(creditTx.new_balance) || 0
+      : parseFloat(items[0].customer_credit_after) || 0;
+
     const netTotal = parseFloat(items[0].net_total) || items.reduce((acc, i) => acc + parseFloat(i.subtotal), 0);
     const amountPaid = parseFloat(items[0].amount_paid) || 0;
-    const debtBalance = isCredit ? Math.max(0, netTotal - amountPaid) : 0;
+    const totalEffectivePaid = amountPaid + creditApplied;
+    const isCredit = items[0].payment === 'credit' || items[0].status === 0 || (netTotal > totalEffectivePaid && items[0].customerID);
+    const newCredit = isCredit ? Math.max(0, netTotal - totalEffectivePaid) : 0;
+
+    let outstandingBefore = 0;
+    let outstandingAfter = 0;
+
+    if (items[0].customerID) {
+      const debt = await Debt.findOne({ customerID: items[0].customerID, facilityID: items[0].facilityID }).lean();
+      const currentBalance = debt ? Math.max(0, Number(debt.balance) || 0) : 0;
+      outstandingAfter = currentBalance;
+      outstandingBefore = Math.max(0, outstandingAfter - newCredit);
+    }
 
     return {
       branch: branch || { facilityID: items[0].facilityID, name: items[0].facilityID, address: '', phone: '' },
@@ -110,7 +135,14 @@ class SalesRepositoryMongo {
         creation: items[0].creation,
         net_total: netTotal,
         amount_paid: amountPaid,
-        debt_amount: debtBalance,
+        credit_applied: creditApplied,
+        customer_credit_applied: creditApplied,
+        customer_credit_before: customerCreditBefore,
+        customer_credit_after: customerCreditAfter,
+        debt_amount: newCredit,
+        new_credit: newCredit,
+        outstanding_before: outstandingBefore,
+        outstanding_after: outstandingAfter,
         change_given: parseFloat(items[0].change_given) || 0,
         discount: parseFloat(items[0].discount) || 0,
         cash: parseFloat(items[0].cash) || 0,
@@ -180,6 +212,7 @@ class SalesRepositoryMongo {
     globalDiscount = 0,
     payment = { cash: 0, pos: 0, transfer: 0, bankName: null },
     isCredit = false,
+    creditUsed = 0,
   }) {
     const session = await mongoose.startSession();
     try {
@@ -256,9 +289,48 @@ class SalesRepositoryMongo {
       const orderID = `${Date.now()}${Math.floor(Math.random() * 90) + 10}`;
       const orderMysqlIds = await reserveLegacyIds(Order, 'orderId', validatedItems.length, session);
       const movementMysqlIds = await reserveLegacyIds(StockMovement, 'stockMovementId', validatedItems.length, session);
-      const totalPaid = (parseFloat(payment.cash) || 0) + (parseFloat(payment.pos) || 0) + (parseFloat(payment.transfer) || 0);
       const netTotal = Math.max(0, grossTotal - globalDiscount - totalItemDiscounts);
-      const paymentType = isCredit ? 'credit' : 'Split Payment';
+
+      // Phase 1.5: Handle Customer Credit / Change application
+      let appliedCredit = 0;
+      let prevCustomerCredit = 0;
+      let newCustomerCredit = 0;
+
+      if (customerID && parseFloat(creditUsed) > 0) {
+        const creditDoc = await CustomerCredit.findOne({ customerID, facilityID }).session(session);
+        const availableCredit = creditDoc ? Math.max(0, Number(creditDoc.balance) || 0) : 0;
+        appliedCredit = Math.min(availableCredit, Math.min(netTotal, parseFloat(creditUsed) || 0));
+
+        if (appliedCredit > 0) {
+          prevCustomerCredit = availableCredit;
+          newCustomerCredit = prevCustomerCredit - appliedCredit;
+          creditDoc.balance = newCustomerCredit;
+          creditDoc.total_used_goods = (Number(creditDoc.total_used_goods) || 0) + appliedCredit;
+          creditDoc.last_activity_date = new Date();
+          await creditDoc.save({ session });
+
+          await CustomerCreditTransaction.create([{
+            creditID: creditDoc._id,
+            customerID,
+            facilityID,
+            transaction_type: 'USED_FOR_PURCHASE',
+            amount: appliedCredit,
+            previous_balance: prevCustomerCredit,
+            new_balance: newCustomerCredit,
+            receipt_number: orderID,
+            reference_id: orderID,
+            payment_method: 'Customer Credit',
+            processed_by_name: staffName,
+            staffID: staffID && mongoose.Types.ObjectId.isValid(staffID) ? staffID : null,
+            notes: `Applied ₦${appliedCredit.toLocaleString()} customer change towards purchase (Order #${orderID})`,
+            date: new Date(),
+          }], { session });
+        }
+      }
+
+      const payableAfterCredit = Math.max(0, netTotal - appliedCredit);
+      const totalPaid = (parseFloat(payment.cash) || 0) + (parseFloat(payment.pos) || 0) + (parseFloat(payment.transfer) || 0);
+      const paymentType = isCredit ? 'credit' : (appliedCredit > 0 && totalPaid === 0 ? 'Customer Credit' : 'Split Payment');
 
       // Phase 2: Deduct stock atomically and insert order line items
       for (const [index, item] of validatedItems.entries()) {
@@ -297,7 +369,10 @@ class SalesRepositoryMongo {
             customer_name: customerName || null,
             buyer_name: buyerName || null,
             amount_paid: totalPaid,
-            change_given: Math.max(0, totalPaid - netTotal),
+            credit_applied: appliedCredit,
+            customer_credit_before: prevCustomerCredit,
+            customer_credit_after: newCustomerCredit,
+            change_given: Math.max(0, totalPaid - payableAfterCredit),
             net_total: netTotal,
             bank_name: payment.bankName || null,
             cash: payment.cash,
@@ -329,41 +404,47 @@ class SalesRepositoryMongo {
         );
       }
 
-      // Handle credit outstanding balance update
-      if (isCredit) {
-        const creditBalance = netTotal - totalPaid;
-        if (creditBalance > 0 && customerID) {
-          const existing = await Debt.findOne({ customerID, facilityID }).session(session).lean();
+      // Handle credit outstanding balance update (if remaining unpaid)
+      const debtIncrease = Math.max(0, payableAfterCredit - totalPaid);
+      if ((isCredit || debtIncrease > 0) && customerID && debtIncrease > 0) {
+        const existing = await Debt.findOne({ customerID, facilityID }).session(session);
 
-          if (existing) {
-            await Debt.updateOne(
-              { customerID, facilityID },
-              {
-                $inc: { amount: totalPaid, balance: creditBalance },
-              },
-              { session }
-            );
-          } else {
-            const [debtMysqlId] = await reserveLegacyIds(Debt, 'debtId', 1, session);
-            await Debt.create(
-              [{
-                customerID,
-                facilityID,
-                staffID,
-                Customer: customerName || buyerName || 'Customer',
-                staff: staffName,
-                amount: totalPaid,
-                balance: creditBalance,
-                mysqlId: debtMysqlId,
-              }],
-              { session }
-            );
-          }
+        if (existing) {
+          existing.balance = Math.max(0, (Number(existing.balance) || 0) + debtIncrease);
+          existing.amount = (Number(existing.amount) || 0) + totalPaid + appliedCredit;
+          existing.updatedAt = new Date();
+          await existing.save({ session });
+        } else {
+          const [debtMysqlId] = await reserveLegacyIds(Debt, 'debtId', 1, session);
+          await Debt.create(
+            [{
+              customerID,
+              facilityID,
+              staffID,
+              Customer: customerName || buyerName || 'Customer',
+              staff: staffName,
+              amount: totalPaid + appliedCredit,
+              balance: debtIncrease,
+              mysqlId: debtMysqlId,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            }],
+            { session }
+          );
         }
       }
 
       await session.commitTransaction();
-      return { orderID, grossTotal, totalItemDiscounts, netTotal, isCredit };
+      return {
+        orderID,
+        grossTotal,
+        totalItemDiscounts,
+        netTotal,
+        creditApplied: appliedCredit,
+        amountPaid: totalPaid,
+        debtIncrease,
+        isCredit,
+      };
     } catch (err) {
       await session.abortTransaction();
       throw err;
